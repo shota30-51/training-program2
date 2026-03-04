@@ -199,14 +199,6 @@
   <div class="container" id="mainContainer">
     <h1 class="title">トレーニングプログラム記録</h1>
 
-    <!-- ===== スプレッドシート同期バー ===== -->
-    <div class="drive-section">
-      <span class="drive-label">📊 スプレッドシート同期</span>
-      <button id="driveSaveBtn" onclick="saveToServer()">💾 今すぐ保存</button>
-      <button id="driveLoadBtn" onclick="loadFromServer()">📂 データ読み込む</button>
-      <span id="driveStatus">待機中</span>
-    </div>
-
     <div class="client-info">
       <input type="text" id="clientName" placeholder="クライアント名">
       <input type="date" id="trainingDate">
@@ -215,6 +207,14 @@
     <div class="button-area">
       <button onclick="addExercise()">種目を追加</button>
       <button id="viewModeBtn">表示モード（別タブ）</button>
+    </div>
+
+    <!-- ===== スプレッドシート同期バー ===== -->
+    <div class="drive-section">
+      <span class="drive-label">スプレッドシート同期</span>
+      <button id="driveSaveBtn" onclick="saveToServer()">今すぐ保存</button>
+      <button id="driveLoadBtn" onclick="loadFromServer()">データ読み込む</button>
+      <span id="driveStatus">待機中</span>
     </div>
   </div>
 
