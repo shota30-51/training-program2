@@ -30,6 +30,49 @@
       letter-spacing: 1px;
     }
 
+    /* ===== スプレッドシート同期エリア ===== */
+    .drive-section {
+      background: #e8f5e9;
+      border: 1px solid #a5d6a7;
+      border-radius: 10px;
+      padding: 12px 18px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .drive-label {
+      font-weight: bold;
+      color: #2e7d32;
+      font-size: 14px;
+      margin-right: 4px;
+      white-space: nowrap;
+    }
+
+    #driveSaveBtn {
+      background: #2e7d32;
+      font-size: 13px;
+      padding: 6px 14px;
+      margin-top: 0;
+    }
+
+    #driveLoadBtn {
+      background: #1565c0;
+      font-size: 13px;
+      padding: 6px 14px;
+      margin-top: 0;
+    }
+
+    #driveStatus {
+      font-size: 12px;
+      color: #555;
+      margin-left: auto;
+      white-space: nowrap;
+    }
+
+    /* ===== 既存スタイル ===== */
     .client-info {
       display: flex;
       justify-content: space-between;
@@ -155,6 +198,15 @@
 <body>
   <div class="container" id="mainContainer">
     <h1 class="title">トレーニングプログラム記録</h1>
+
+    <!-- ===== スプレッドシート同期バー ===== -->
+    <div class="drive-section">
+      <span class="drive-label">📊 スプレッドシート同期</span>
+      <button id="driveSaveBtn" onclick="saveToServer()">💾 今すぐ保存</button>
+      <button id="driveLoadBtn" onclick="loadFromServer()">📂 データ読み込む</button>
+      <span id="driveStatus">待機中</span>
+    </div>
+
     <div class="client-info">
       <input type="text" id="clientName" placeholder="クライアント名">
       <input type="date" id="trainingDate">
@@ -172,6 +224,122 @@
   </div>
 
   <script>
+    // =====================================================
+    // ⚙️ Apps Script URL（デプロイ済み）
+    // =====================================================
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw-g1fvDcEs7v8l1V4j0fJ_UOlVi-aQHGgCdvgwqOBUFO7c5ric2aXn6wieYsuq_K3q_A/exec';
+
+    let memoSaveTimer = null;
+
+    // ✅ メモをスプレッドシートに保存（デバウンス2秒）
+    function scheduleMemoSave(clientName, memo) {
+      clearTimeout(memoSaveTimer);
+      document.getElementById('driveStatus').textContent = '...自動保存準備中';
+      memoSaveTimer = setTimeout(async () => {
+        await postToServer({ action: 'saveMemo', clientName, memo });
+      }, 2000);
+    }
+
+    // ✅ 表示モード生成時：トレーニング記録を保存
+    async function sendTraining(date, clientName, exercises) {
+      await postToServer({ action: 'saveTraining', date, clientName, exercises });
+    }
+
+    // ✅ 手動「今すぐ保存」ボタン：メモ＋現在の種目を送信
+    async function saveToServer() {
+      const clientName = document.getElementById('clientName').value.trim();
+      const date       = document.getElementById('trainingDate').value;
+      const memo       = document.getElementById('trainerMemo').value;
+
+      if (!clientName) {
+        document.getElementById('driveStatus').textContent = '⚠️ クライアント名を入力してください';
+        return;
+      }
+
+      document.getElementById('driveStatus').textContent = '💾 保存中...';
+
+      // メモ保存
+      if (memo) {
+        await postToServer({ action: 'saveMemo', clientName, memo });
+      }
+
+      // 種目データを収集して保存
+      const exercisesData = collectExercises();
+      if (exercisesData.length > 0 && date) {
+        await postToServer({ action: 'saveTraining', date, clientName, exercises: exercisesData });
+      }
+    }
+
+    // ✅ 共通POST関数（no-cors：応答不要の送信）
+    async function postToServer(payload) {
+      try {
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify(payload)
+        });
+        const now = new Date().toLocaleTimeString('ja-JP');
+        document.getElementById('driveStatus').textContent = `✅ 保存完了 ${now}`;
+      } catch(err) {
+        console.error('Save error:', err);
+        document.getElementById('driveStatus').textContent = '❌ 保存失敗（通信エラー）';
+      }
+    }
+
+    // ✅ スプレッドシートからデータ読み込み
+    async function loadFromServer() {
+      document.getElementById('driveStatus').textContent = '📂 読み込み中...';
+      try {
+        const res  = await fetch(SCRIPT_URL);
+        const data = await res.json();
+
+        let count = 0;
+        Object.entries(data.memos   || {}).forEach(([k, v]) => { localStorage.setItem(k, v); count++; });
+        Object.entries(data.weights || {}).forEach(([k, v]) => { localStorage.setItem(k, v); count++; });
+
+        const now = new Date().toLocaleTimeString('ja-JP');
+        document.getElementById('driveStatus').textContent = `✅ ${count}件読み込み完了 ${now}`;
+
+        // クライアント名が入力済みならメモを即反映
+        const clientName = document.getElementById('clientName').value.trim();
+        if (clientName) {
+          document.getElementById('trainerMemo').value =
+            localStorage.getItem('memo_' + clientName) || '';
+        }
+      } catch(err) {
+        console.error('Load error:', err);
+        document.getElementById('driveStatus').textContent = '❌ 読み込み失敗';
+      }
+    }
+
+    // ✅ 画面上の種目データを収集
+    function collectExercises() {
+      const result = [];
+      document.querySelectorAll('.exercise').forEach(ex => {
+        const part         = ex.querySelector('.body-part').value;
+        const partOther    = ex.querySelector('.body-part-other');
+        const partName     = part === 'その他' ? partOther.value : part;
+        const exerciseName = ex.querySelector('.exercise-name').value;
+        const remarks      = ex.querySelector('textarea[placeholder="備考"]').value;
+        const setsData     = [];
+
+        ex.querySelectorAll('.set-group').forEach(s => {
+          setsData.push({
+            weight: s.querySelector('input[placeholder="重量(kg)"]').value,
+            reps:   s.querySelector('input[placeholder="回数"]').value
+          });
+        });
+
+        if (partName && exerciseName) {
+          result.push({ part: partName, name: exerciseName, remarks, sets: setsData });
+        }
+      });
+      return result;
+    }
+
+    // =====================================================
+    // 種目データ
+    // =====================================================
     const exerciseOptions = {
       "胸": ["ベンチプレス", "インクラインベンチプレス", "デクラインベンチプレス", "ダンベルプレス", "インクラインダンベルプレス", "デクラインダンベルプレス", "ケーブルクロスオーバー", "プッシュアップ", "ダンベルフライ", "ペックフライ", "チェストプレス", "プルオーバー", "ケーブルフライ", "ディップス"],
       "肩": ["ショルダープレス", "バーベルショルダープレス","ミリタリープレス", "スミスショルダープレス","サイドレイズ","フロントレイズ", "リアレイズ", "アップライトロウ", "フェイスプル", "リアデルト", "アーノルドプレス", "ダンベルショルダープレス", "ケーブルサイドレイズ", "オーバーヘッドプレス", "リアデルトフライ", "インナーマッスルトレーニング"],
@@ -182,7 +350,6 @@
       "体幹": ["プランク", "クランチ", "レッグレイズ", "サイドプランク", "アブローラー", "サイドベンド"]
     };
 
-    // --- 種目追加 ---
     function addExercise() {
       const exerciseContainer = document.getElementById('exercises');
       const exercise = document.createElement('div');
@@ -206,7 +373,6 @@
 
       const maxWeightDisplay = document.createElement('div');
       maxWeightDisplay.className = 'max-weight';
-      maxWeightDisplay.textContent = '';
 
       bodyPartSelect.addEventListener('change', () => {
         const selectedPart = bodyPartSelect.value;
@@ -221,7 +387,6 @@
         }
       });
 
-      // 種目選択時に過去最高重量を表示
       exerciseSelect.addEventListener('change', () => {
         const clientName = document.getElementById('clientName').value.trim();
         const selectedExercise = exerciseSelect.value;
@@ -246,7 +411,7 @@
 
       const remarks = document.createElement('textarea');
       remarks.placeholder = '備考';
-      remarks.style.cssText = 'width: 100%; height: 60px; border-radius: 6px; padding: 8px; border: 1px solid #ccc; font-size: 15px;';
+      remarks.style.cssText = 'width:100%;height:60px;border-radius:6px;padding:8px;border:1px solid #ccc;font-size:15px;';
 
       exercise.appendChild(bodyPartSelect);
       exercise.appendChild(bodyPartInput);
@@ -269,7 +434,6 @@
       exercise.appendChild(document.createElement('br'));
       exercise.appendChild(document.createElement('br'));
       exercise.appendChild(remarks);
-
       exerciseContainer.appendChild(exercise);
     }
 
@@ -285,16 +449,11 @@
       setsContainer.appendChild(newSet);
     }
 
-    function removeExercise(button) {
-      button.closest('.exercise').remove();
-    }
-
-    function removeSet(button) {
-      button.closest('.set-group').remove();
-    }
+    function removeExercise(button) { button.closest('.exercise').remove(); }
+    function removeSet(button)      { button.closest('.set-group').remove(); }
 
     // ✅ 表示モード（メモは出さない）
-    document.getElementById('viewModeBtn').addEventListener('click', () => {
+    document.getElementById('viewModeBtn').addEventListener('click', async () => {
       const name = document.getElementById('clientName').value;
       const date = document.getElementById('trainingDate').value;
       const exercises = document.querySelectorAll('.exercise');
@@ -315,35 +474,39 @@
           <div>日付：${date}</div>
         </div>`;
 
+      const exercisesData = [];
+
       exercises.forEach((ex) => {
-        const part = ex.querySelector('.body-part').value;
-        const partOther = ex.querySelector('.body-part-other');
-        const partName = part === "その他" ? partOther.value : part;
+        const part         = ex.querySelector('.body-part').value;
+        const partOther    = ex.querySelector('.body-part-other');
+        const partName     = part === 'その他' ? partOther.value : part;
         const exerciseName = ex.querySelector('.exercise-name').value;
-        const remarks = ex.querySelector('textarea[placeholder="備考"]').value;
-        const sets = ex.querySelectorAll('.set-group');
-        const weights = [];
+        const remarks      = ex.querySelector('textarea[placeholder="備考"]').value;
+        const sets         = ex.querySelectorAll('.set-group');
+        const weights      = [];
+        const setsData     = [];
 
         content += `<div class="exercise"><strong>${partName}：${exerciseName}</strong><br>`;
         sets.forEach((s, index) => {
           const weight = parseFloat(s.querySelector('input[placeholder="重量(kg)"]').value);
-          const reps = s.querySelector('input[placeholder="回数"]').value;
+          const reps   = s.querySelector('input[placeholder="回数"]').value;
           if (!isNaN(weight)) weights.push(weight);
+          setsData.push({ weight: weight || '', reps: reps || '' });
           content += `<div class="set">セット${index + 1}：${weight || '-'}kg × ${reps || '-'}回</div>`;
         });
-        if (remarks) {
-          content += `<div class="remarks">備考：${remarks}</div>`;
-        }
+        if (remarks) content += `<div class="remarks">備考：${remarks}</div>`;
         content += `</div>`;
 
-        // ✅ 最大重量を保存
+        // localStorageにも最大重量を保存（過去最高表示のため）
         if (weights.length > 0 && name && exerciseName) {
           const maxWeight = Math.max(...weights);
           const key = `record_${name}_${exerciseName}`;
           const prev = parseFloat(localStorage.getItem(key));
-          if (!prev || maxWeight > prev) {
-            localStorage.setItem(key, maxWeight);
-          }
+          if (!prev || maxWeight > prev) localStorage.setItem(key, maxWeight);
+        }
+
+        if (partName && exerciseName) {
+          exercisesData.push({ part: partName, name: exerciseName, remarks, sets: setsData });
         }
       });
 
@@ -351,19 +514,26 @@
       const newWindow = window.open('', '_blank');
       newWindow.document.write(content);
       newWindow.document.close();
-    });
 
-    // ✅ メモ保存機能
-    document.getElementById("trainerMemo").addEventListener("input", () => {
-      const name = document.getElementById("clientName").value;
-      if (name) {
-        localStorage.setItem("memo_" + name, document.getElementById("trainerMemo").value);
+      // ✅ 表示モード生成と同時にスプレッドシートへ自動保存
+      if (name && date && exercisesData.length > 0) {
+        await sendTraining(date, name, exercisesData);
       }
     });
 
-    document.getElementById("clientName").addEventListener("input", () => {
-      const name = document.getElementById("clientName").value;
-      document.getElementById("trainerMemo").value = localStorage.getItem("memo_" + name) || "";
+    // ✅ メモ入力 → 2秒後に自動保存
+    document.getElementById('trainerMemo').addEventListener('input', () => {
+      const name = document.getElementById('clientName').value.trim();
+      if (name) {
+        const memo = document.getElementById('trainerMemo').value;
+        localStorage.setItem('memo_' + name, memo);
+        scheduleMemoSave(name, memo);
+      }
+    });
+
+    document.getElementById('clientName').addEventListener('input', () => {
+      const name = document.getElementById('clientName').value;
+      document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + name) || '';
     });
 
     addExercise();
