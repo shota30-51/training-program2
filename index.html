@@ -32,43 +32,44 @@
 
     /* ===== スプレッドシート同期エリア ===== */
     .drive-section {
-      background: #e8f5e9;
-      border: 1px solid #a5d6a7;
+      background: #f1f8e9;
+      border: 1px solid #c5e1a5;
       border-radius: 10px;
-      padding: 12px 18px;
-      margin-bottom: 20px;
+      padding: 18px 24px;
+      margin-top: 40px;
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+      gap: 12px;
+      text-align: center;
     }
 
     .drive-label {
       font-weight: bold;
-      color: #2e7d32;
+      color: #33691e;
       font-size: 14px;
-      margin-right: 4px;
-      white-space: nowrap;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .drive-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
     }
 
     #driveSaveBtn {
       background: #2e7d32;
-      font-size: 13px;
-      padding: 6px 14px;
+      font-size: 14px;
+      padding: 10px 32px;
       margin-top: 0;
-    }
-
-    #driveLoadBtn {
-      background: #1565c0;
-      font-size: 13px;
-      padding: 6px 14px;
-      margin-top: 0;
+      letter-spacing: 1px;
     }
 
     #driveStatus {
       font-size: 12px;
-      color: #555;
-      margin-left: auto;
+      color: #666;
       white-space: nowrap;
     }
 
@@ -212,8 +213,9 @@
     <!-- ===== スプレッドシート同期バー ===== -->
     <div class="drive-section">
       <span class="drive-label">スプレッドシート同期</span>
-      <button id="driveSaveBtn" onclick="saveToServer()">今すぐ保存</button>
-      <button id="driveLoadBtn" onclick="loadFromServer()">データ読み込む</button>
+      <div class="drive-buttons">
+        <button id="driveSaveBtn" onclick="saveToServer()">保存</button>
+      </div>
       <span id="driveStatus">待機中</span>
     </div>
   </div>
