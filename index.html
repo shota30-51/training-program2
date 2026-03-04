@@ -280,19 +280,21 @@
       }
     }
 
-    // ✅ 共通POST関数（no-cors：応答不要の送信）
+    // ✅ 共通送信関数（GETのURLパラメータでpayloadを送信）
     async function postToServer(payload) {
       try {
-        await fetch(SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(payload)
-        });
-        const now = new Date().toLocaleTimeString('ja-JP');
-        document.getElementById('driveStatus').textContent = `✅ 保存完了 ${now}`;
+        const url = SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.ok) {
+          const now = new Date().toLocaleTimeString('ja-JP');
+          document.getElementById('driveStatus').textContent = `✅ 保存完了 ${now}`;
+        } else {
+          document.getElementById('driveStatus').textContent = '❌ エラー: ' + (data.error || '不明');
+        }
       } catch(err) {
         console.error('Save error:', err);
-        document.getElementById('driveStatus').textContent = '❌ 保存失敗（通信エラー）';
+        document.getElementById('driveStatus').textContent = '❌ ' + err.message;
       }
     }
 
