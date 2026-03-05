@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>トレーニングプログラム記録</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   <style>
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', sans-serif;
@@ -526,8 +527,44 @@
       if (name && date && exercisesData.length > 0) {
         const memo = document.getElementById('trainerMemo').value;
         await sendTraining(date, name, exercisesData);
-        await postToServer({ action: 'savePDF', date, clientName: name, exercises: exercisesData, memo });
-        document.getElementById('driveStatus').textContent = '📄 PDF保存中...（数秒後にドライブへ反映）';
+
+        // ブラウザでPDF生成 → Driveへ送信
+        document.getElementById('driveStatus').textContent = '📄 PDF生成中...';
+        const wrap = document.createElement('div');
+        wrap.innerHTML = content;
+        wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+        document.body.appendChild(wrap);
+        await new Promise(r => setTimeout(r, 200));
+
+        // 1ページに収まるよう自動縮小
+        const ratio = Math.min(1, 980 / wrap.scrollHeight);
+        if (ratio < 1) wrap.style.zoom = (ratio * 100).toFixed(1) + '%';
+
+        try {
+          const blob = await html2pdf().set({
+            margin: 8,
+            html2canvas: { scale: 1.5, useCORS: true, logging: false },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+          }).from(wrap).outputPdf('blob');
+          document.body.removeChild(wrap);
+
+          const base64 = await new Promise(r => {
+            const reader = new FileReader();
+            reader.onload = e => r(e.target.result.split(',')[1]);
+            reader.readAsDataURL(blob);
+          });
+
+          const res = await fetch(SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'savePDFBase64', clientName: name, date, pdfBase64: base64 })
+          });
+          const result = await res.json();
+          document.getElementById('driveStatus').textContent = result.ok ? '✅ PDF保存完了' : '❌ PDF失敗';
+        } catch(err) {
+          try { document.body.removeChild(wrap); } catch(e2) {}
+          console.error(err);
+          document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
+        }
       }
     });
 
