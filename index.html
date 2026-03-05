@@ -529,23 +529,23 @@
         await sendTraining(date, name, exercisesData);
 
         // ブラウザでPDF生成 → Driveへ送信
-        document.getElementById('driveStatus').textContent = '📄 PDF生成中...';
+        // ローディングオーバーレイを表示（html2canvasは画面内の要素が必要）
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.95);z-index:10001;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#333;';
+        overlay.textContent = '📄 PDF生成中... しばらくお待ちください';
+        document.body.appendChild(overlay);
 
-        // contentはフルHTMLなのでDOMParserで正しく解析
         const parsed = new DOMParser().parseFromString(content, 'text/html');
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+        wrap.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:white;z-index:10000;';
 
-        // スタイルを取り出して追加
         const styleEl = document.createElement('style');
         styleEl.textContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
         wrap.appendChild(styleEl);
-
-        // ボディの中身を追加
         Array.from(document.importNode(parsed.body, true).childNodes).forEach(n => wrap.appendChild(n));
 
         document.body.appendChild(wrap);
-        await new Promise(r => setTimeout(r, 300));
+        await new Promise(r => setTimeout(r, 400));
 
         // 1ページに収まるよう自動縮小
         const ratio = Math.min(1, 980 / wrap.scrollHeight);
@@ -555,10 +555,11 @@
         try {
           const blob = await html2pdf().set({
             margin: 8,
-            html2canvas: { scale: 1.5, useCORS: true, logging: false },
+            html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 794 },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
           }).from(wrap).outputPdf('blob');
           document.body.removeChild(wrap);
+          document.body.removeChild(overlay);
 
           const base64 = await new Promise(r => {
             const reader = new FileReader();
@@ -574,6 +575,7 @@
           document.getElementById('driveStatus').textContent = result.ok ? '✅ PDF保存完了' : '❌ PDF失敗';
         } catch(err) {
           try { document.body.removeChild(wrap); } catch(e2) {}
+          try { document.body.removeChild(overlay); } catch(e2) {}
           console.error(err);
           document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
         }
