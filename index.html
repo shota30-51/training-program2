@@ -522,9 +522,12 @@
       newWindow.document.write(content);
       newWindow.document.close();
 
-      // ✅ 表示モード生成と同時にスプレッドシートへ自動保存
+      // ✅ 表示モード生成と同時にスプレッドシート＆PDFへ自動保存
       if (name && date && exercisesData.length > 0) {
+        const memo = document.getElementById('trainerMemo').value;
         await sendTraining(date, name, exercisesData);
+        await postToServer({ action: 'savePDF', date, clientName: name, exercises: exercisesData, memo });
+        document.getElementById('driveStatus').textContent = '📄 PDF保存中...（数秒後にドライブへ反映）';
       }
     });
 
