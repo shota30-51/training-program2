@@ -530,15 +530,27 @@
 
         // ブラウザでPDF生成 → Driveへ送信
         document.getElementById('driveStatus').textContent = '📄 PDF生成中...';
+
+        // contentはフルHTMLなのでDOMParserで正しく解析
+        const parsed = new DOMParser().parseFromString(content, 'text/html');
         const wrap = document.createElement('div');
-        wrap.innerHTML = content;
         wrap.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white;';
+
+        // スタイルを取り出して追加
+        const styleEl = document.createElement('style');
+        styleEl.textContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
+        wrap.appendChild(styleEl);
+
+        // ボディの中身を追加
+        Array.from(document.importNode(parsed.body, true).childNodes).forEach(n => wrap.appendChild(n));
+
         document.body.appendChild(wrap);
-        await new Promise(r => setTimeout(r, 200));
+        await new Promise(r => setTimeout(r, 300));
 
         // 1ページに収まるよう自動縮小
         const ratio = Math.min(1, 980 / wrap.scrollHeight);
         if (ratio < 1) wrap.style.zoom = (ratio * 100).toFixed(1) + '%';
+        await new Promise(r => setTimeout(r, 100));
 
         try {
           const blob = await html2pdf().set({
