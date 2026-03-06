@@ -241,6 +241,113 @@
 
     let memoSaveTimer = null;
 
+    // =====================================================
+    // PDF表示モード判定（?mode=pdf で別タブから起動）
+    // Blob URL・document.write()を使わない iOS 対応方式
+    // =====================================================
+    const PDF_MODE = new URLSearchParams(location.search).get('mode') === 'pdf';
+
+    // === 表示用HTML生成（データオブジェクトから構築） ===
+    function buildDisplayBody(clientName, date, exercisesData) {
+      let body = '';
+      body += '<h1 style="text-align:center;background:linear-gradient(to right,#1a237e,#0d47a1);color:white;padding:20px;border-radius:8px;font-size:24px;margin:0 0 20px 0;letter-spacing:1px;font-family:Segoe UI,Helvetica Neue,sans-serif;">トレーニングプログラム記録</h1>';
+      body += '<div style="display:flex;justify-content:space-between;margin:20px 0;font-size:18px;font-family:Segoe UI,Helvetica Neue,sans-serif;">';
+      body += '<div>クライアント名：' + (clientName ? clientName + ' 様' : '') + '</div>';
+      body += '<div>日付：' + (date || '') + '</div>';
+      body += '</div>';
+      exercisesData.forEach(function(ex) {
+        body += '<div style="border:1px solid #ccc;padding:20px;border-radius:12px;margin-bottom:20px;background-color:#f9f9f9;font-family:Segoe UI,Helvetica Neue,sans-serif;">';
+        body += '<strong>' + ex.part + '：' + ex.name + '</strong><br>';
+        (ex.sets || []).forEach(function(s, i) {
+          const w = parseFloat(s.weight);
+          body += '<div style="margin-left:20px;padding:2px 0;">セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg × ' + (s.reps || '-') + '回</div>';
+        });
+        if (ex.remarks) {
+          body += '<div style="color:#c62828;font-size:15px;white-space:pre-wrap;margin-top:10px;">備考：' + ex.remarks + '</div>';
+        }
+        body += '</div>';
+      });
+      return body;
+    }
+
+    // ===== PDF表示モード本体 =====
+    if (PDF_MODE) {
+      const raw = localStorage.getItem('__pdfData');
+      if (!raw) {
+        document.body.style.cssText = 'font-family:sans-serif;padding:40px;';
+        document.body.innerHTML = '<p style="color:red;font-size:18px;">❌ データなし。もう一度保存してください。</p>';
+      } else {
+        const pdfData = JSON.parse(raw);
+        document.body.style.cssText = 'margin:0;padding:0;background:white;font-family:Segoe UI,Helvetica Neue,sans-serif;';
+        document.body.innerHTML =
+          '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
+          + '<div id="pdfContent" style="padding:40px;">' + pdfData.displayBody + '</div>';
+
+        const st = document.getElementById('pdfStatus');
+
+        (async function runPDF() {
+          try {
+            // html2pdf.js を読み込み
+            await new Promise(function(resolve, reject) {
+              const s = document.createElement('script');
+              s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+              s.onload  = resolve;
+              s.onerror = function() { reject(new Error('ライブラリ読込失敗')); };
+              document.head.appendChild(s);
+            });
+
+            // PDF生成（pdfStatusを隠してから生成）
+            st.style.display = 'none';
+            const blob = await html2pdf().set({
+              margin: 10,
+              image: { type: 'jpeg', quality: 0.95 },
+              html2canvas: { scale: 1, useCORS: true, backgroundColor: '#ffffff' },
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(document.getElementById('pdfContent')).outputPdf('blob');
+
+            st.style.display = 'block';
+            st.textContent = '📤 アップロード中...';
+
+            // base64変換
+            const base64 = await new Promise(function(resolve, reject) {
+              const reader = new FileReader();
+              reader.onload  = function(e) { resolve(e.target.result.split(',')[1]); };
+              reader.onerror = function() { reject(new Error('変換失敗')); };
+              reader.readAsDataURL(blob);
+            });
+
+            // Google Driveへ送信
+            const res = await fetch(pdfData.scriptURL, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'savePDFBase64',
+                clientName: pdfData.clientName,
+                date: pdfData.date,
+                pdfBase64: base64
+              })
+            });
+            const result = await res.json();
+
+            if (result.ok) {
+              st.textContent = '✅ 保存成功';
+              st.style.background    = '#e8f5e9';
+              st.style.borderColor   = '#4caf50';
+              st.style.color         = '#2e7d32';
+            } else {
+              throw new Error(result.error || '保存失敗');
+            }
+          } catch (err) {
+            st.style.display       = 'block';
+            st.textContent         = '❌ 保存失敗: ' + err.message;
+            st.style.background    = '#ffebee';
+            st.style.borderColor   = '#f44336';
+            st.style.color         = '#c62828';
+          }
+        })();
+      }
+    }
+
     // ✅ メモをスプレッドシートに保存（デバウンス2秒）
     function scheduleMemoSave(clientName, memo) {
       clearTimeout(memoSaveTimer);
@@ -255,7 +362,7 @@
       await postToServer({ action: 'saveTraining', date, clientName, exercises });
     }
 
-    // ✅ 手動「保存」ボタン：メモ＆種目保存 → 表示モード＋PDF生成を実行
+    // ✅ 手動「保存」ボタン：スプシ保存 → PDF表示タブを開く（iOS対応）
     async function saveToServer() {
       const clientName = document.getElementById('clientName').value.trim();
       const date       = document.getElementById('trainingDate').value;
@@ -265,26 +372,21 @@
         document.getElementById('driveStatus').textContent = '⚠️ クライアント名を入力してください';
         return;
       }
-
       if (!date) {
         document.getElementById('driveStatus').textContent = '⚠️ 日付を選択してください';
         return;
       }
 
-      // ★ ユーザー操作の直後（await前）にウィンドウを開く ★
-      // document.write()はiOSでLoad Failedになるため Blob URLを使用
-      const loadingHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>保存中...</title></head>'
-        + '<body style="font-family:Helvetica Neue,sans-serif;padding:60px;text-align:center;background:#f9f9f9;">'
-        + '<div style="font-size:48px;margin-bottom:20px;">⏳</div>'
-        + '<h2 style="color:#1a237e;">スプシ＆PDFを保存中...</h2>'
-        + '<p style="color:#555;margin-top:12px;">しばらくお待ちください</p>'
-        + '</body></html>';
-      const loadingBlob = new Blob([loadingHTML], { type: 'text/html' });
-      const loadingURL  = URL.createObjectURL(loadingBlob);
-      const loadingWindow = window.open(loadingURL, '_blank');
-      if (loadingWindow) {
-        window.__pdfResultWindow = loadingWindow;
-      }
+      // データ収集・最高重量更新・localStorage書き込み（await前に実行）
+      const exercisesData = collectExercises();
+      updateMaxWeights(clientName, exercisesData);
+      const displayBody = buildDisplayBody(clientName, date, exercisesData);
+      localStorage.setItem('__pdfData', JSON.stringify({
+        clientName, date, displayBody, scriptURL: SCRIPT_URL
+      }));
+
+      // ★ await前（ユーザー操作の直後）にウィンドウを開く → iOS ポップアップブロック回避 ★
+      window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
 
       document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
 
@@ -292,15 +394,25 @@
       if (memo) {
         await postToServer({ action: 'saveMemo', clientName, memo });
       }
-
       // 種目データをスプシに保存
-      const exercisesData = collectExercises();
       if (exercisesData.length > 0) {
         await postToServer({ action: 'saveTraining', date, clientName, exercises: exercisesData });
       }
 
-      // その後、表示モード＋PDF保存を実行
-      document.getElementById('viewModeBtn').click();
+      document.getElementById('driveStatus').textContent = '✅ 保存成功';
+    }
+
+    // ✅ 種目の最高重量をlocalStorageに記録
+    function updateMaxWeights(clientName, exercisesData) {
+      exercisesData.forEach(function(ex) {
+        const weights = (ex.sets || []).map(function(s) { return parseFloat(s.weight); }).filter(function(w) { return !isNaN(w); });
+        if (weights.length > 0 && clientName && ex.name) {
+          const maxWeight = Math.max.apply(null, weights);
+          const key  = 'record_' + clientName + '_' + ex.name;
+          const prev = parseFloat(localStorage.getItem(key));
+          if (!prev || maxWeight > prev) localStorage.setItem(key, maxWeight);
+        }
+      });
     }
 
     // ✅ 共通送信関数（GET + no-cors でURLパラメータ送信）
@@ -482,181 +594,45 @@
     function removeExercise(button) { button.closest('.exercise').remove(); }
     function removeSet(button)      { button.closest('.set-group').remove(); }
 
-    // ✅ html2pdf.js を動的に読み込む関数
-    function loadHtml2PdfLib() {
-      return new Promise((resolve, reject) => {
-        if (typeof html2pdf !== 'undefined') { resolve(); return; }
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('html2pdf.js読み込み失敗'));
-        document.head.appendChild(s);
+    // ✅ 通常モードのみ初期化（PDF表示モードでは不要）
+    if (!PDF_MODE) {
+      // 表示モードボタン：?mode=pdf タブを開く（localStorage経由でデータ渡し）
+      document.getElementById('viewModeBtn').addEventListener('click', function() {
+        const clientName    = document.getElementById('clientName').value.trim();
+        const date          = document.getElementById('trainingDate').value;
+        const exercisesData = collectExercises();
+
+        // 過去最高重量を更新
+        updateMaxWeights(clientName, exercisesData);
+
+        // データをlocalStorageに書き込んでから新タブを開く
+        const displayBody = buildDisplayBody(clientName, date, exercisesData);
+        localStorage.setItem('__pdfData', JSON.stringify({
+          clientName, date, displayBody, scriptURL: SCRIPT_URL
+        }));
+        window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
       });
+
+      // メモ入力 → 2秒後に自動保存
+      document.getElementById('trainerMemo').addEventListener('input', function() {
+        const name = document.getElementById('clientName').value.trim();
+        if (name) {
+          const memo = document.getElementById('trainerMemo').value;
+          localStorage.setItem('memo_' + name, memo);
+          scheduleMemoSave(name, memo);
+        }
+      });
+
+      document.getElementById('clientName').addEventListener('input', function() {
+        const name = document.getElementById('clientName').value;
+        document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + name) || '';
+      });
+
+      addExercise();
+
+      // ページ読み込み時にスプシから自動取得
+      loadFromServer();
     }
-
-    // ✅ 表示モード（メモは出さない）＋ PDF生成はメインウィンドウで実行
-    document.getElementById('viewModeBtn').addEventListener('click', async () => {
-      const name = document.getElementById('clientName').value;
-      const date = document.getElementById('trainingDate').value;
-      const exercises = document.querySelectorAll('.exercise');
-
-      // === 表示用HTMLをインラインスタイルで構築 ===
-      let displayBody = '';
-      displayBody += '<h1 style="text-align:center;background:linear-gradient(to right,#1a237e,#0d47a1);color:white;padding:20px;border-radius:8px;font-size:24px;margin:0 0 20px 0;letter-spacing:1px;font-family:Segoe UI,Helvetica Neue,sans-serif;">トレーニングプログラム記録</h1>';
-      displayBody += '<div style="display:flex;justify-content:space-between;margin:20px 0;font-size:18px;font-family:Segoe UI,Helvetica Neue,sans-serif;">';
-      displayBody += '<div>クライアント名：' + (name ? name + ' 様' : '') + '</div>';
-      displayBody += '<div>日付：' + (date || '') + '</div>';
-      displayBody += '</div>';
-
-      const exercisesData = [];
-
-      exercises.forEach((ex) => {
-        const part         = ex.querySelector('.body-part').value;
-        const partOther    = ex.querySelector('.body-part-other');
-        const partName     = part === 'その他' ? partOther.value : part;
-        const exerciseName = ex.querySelector('.exercise-name').value;
-        const remarks      = ex.querySelector('textarea[placeholder="備考"]').value;
-        const sets         = ex.querySelectorAll('.set-group');
-        const weights      = [];
-        const setsData     = [];
-
-        displayBody += '<div style="border:1px solid #ccc;padding:20px;border-radius:12px;margin-bottom:20px;background-color:#f9f9f9;font-family:Segoe UI,Helvetica Neue,sans-serif;">';
-        displayBody += '<strong>' + partName + '：' + exerciseName + '</strong><br>';
-
-        sets.forEach((s, index) => {
-          const weight = parseFloat(s.querySelector('input[placeholder="重量(kg)"]').value);
-          const reps   = s.querySelector('input[placeholder="回数"]').value;
-          if (!isNaN(weight)) weights.push(weight);
-          setsData.push({ weight: weight || '', reps: reps || '' });
-          displayBody += '<div style="margin-left:20px;padding:2px 0;">セット' + (index + 1) + '：' + (weight || '-') + 'kg × ' + (reps || '-') + '回</div>';
-        });
-
-        if (remarks) {
-          displayBody += '<div style="color:#c62828;font-size:15px;white-space:pre-wrap;margin-top:10px;">備考：' + remarks + '</div>';
-        }
-        displayBody += '</div>';
-
-        if (weights.length > 0 && name && exerciseName) {
-          const maxWeight = Math.max(...weights);
-          const key = 'record_' + name + '_' + exerciseName;
-          const prev = parseFloat(localStorage.getItem(key));
-          if (!prev || maxWeight > prev) localStorage.setItem(key, maxWeight);
-        }
-
-        if (partName && exerciseName) {
-          exercisesData.push({ part: partName, name: exerciseName, remarks, sets: setsData });
-        }
-      });
-
-      // === PDF生成スクリプト（表示ウィンドウ内で実行） ===
-      // iOS/iPadOSではバックグラウンドタブのJSが停止するため、
-      // アクティブな表示ウィンドウ自身にPDF生成を担わせる
-      const clientNameSafe = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-      const pdfScript = '(function(){'
-        + 'var SCRIPT_URL=\'' + SCRIPT_URL + '\';'
-        + 'var CLIENT_NAME=\'' + clientNameSafe + '\';'
-        + 'var DATE=\'' + date + '\';'
-        + 'async function run(){'
-        + '  var st=document.getElementById(\'pdfStatus\');'
-        + '  try{'
-        + '    await new Promise(function(ok,ng){'
-        + '      var s=document.createElement(\'script\');'
-        + '      s.src=\'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js\';'
-        + '      s.onload=ok;'
-        + '      s.onerror=function(){ng(new Error(\'ライブラリ読込失敗\'))};'
-        + '      document.head.appendChild(s);'
-        + '    });'
-        + '    st.style.display=\'none\';'
-        + '    var blob=await html2pdf().set({'
-        + '      margin:10,'
-        + '      image:{type:\'jpeg\',quality:0.95},'
-        + '      html2canvas:{scale:1,useCORS:true,backgroundColor:\'#ffffff\'},'
-        + '      jsPDF:{unit:\'mm\',format:\'a4\',orientation:\'portrait\'}'
-        + '    }).from(document.getElementById(\'pdfContent\')).outputPdf(\'blob\');'
-        + '    st.style.display=\'block\';st.textContent=\'📤 アップロード中...\';'
-        + '    var b64=await new Promise(function(ok,ng){'
-        + '      var r=new FileReader();'
-        + '      r.onload=function(e){ok(e.target.result.split(\',\')[1])};'
-        + '      r.onerror=function(){ng(new Error(\'変換失敗\'))};'
-        + '      r.readAsDataURL(blob);'
-        + '    });'
-        + '    var res=await fetch(SCRIPT_URL,{'
-        + '      method:\'POST\','
-        + '      headers:{\'Content-Type\':\'application/json\'},'
-        + '      body:JSON.stringify({action:\'savePDFBase64\',clientName:CLIENT_NAME,date:DATE,pdfBase64:b64})'
-        + '    });'
-        + '    var result=await res.json();'
-        + '    if(result.ok){'
-        + '      st.textContent=\'✅ 保存成功\';'
-        + '      st.style.background=\'#e8f5e9\';st.style.borderColor=\'#4caf50\';st.style.color=\'#2e7d32\';'
-        + '    }else{throw new Error(result.error||\'保存失敗\')}'
-        + '  }catch(e){'
-        + '    st.style.display=\'block\';'
-        + '    st.textContent=\'❌ 保存失敗: \'+e.message;'
-        + '    st.style.background=\'#ffebee\';st.style.borderColor=\'#f44336\';st.style.color=\'#c62828\';'
-        + '  }'
-        + '}'
-        + 'if(document.readyState===\'complete\'){setTimeout(run,500)}'
-        + 'else{window.addEventListener(\'load\',function(){setTimeout(run,500)})}'
-        + '})();';
-
-      // === 表示ウィンドウのHTML（スクリプト埋め込み） ===
-      // document.write()はiOSでLoad Failedになるため Blob URLで表示
-      const viewHTML = '<!DOCTYPE html><html><head><title>トレーニング記録</title><meta charset="UTF-8"></head>'
-        + '<body style="font-family:Segoe UI,Helvetica Neue,sans-serif;background:white;color:#111;margin:0;">'
-        + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
-        + '<div id="pdfContent" style="padding:40px;">'
-        + displayBody
-        + '</div>'
-        + '<scr' + 'ipt>' + pdfScript + '</scr' + 'ipt>'
-        + '</body></html>';
-
-      const viewBlob = new Blob([viewHTML], { type: 'text/html' });
-      const viewURL  = URL.createObjectURL(viewBlob);
-
-      // === 既存ウィンドウへ遷移 or 新規で開く ===
-      let targetWindow = (window.__pdfResultWindow && !window.__pdfResultWindow.closed)
-        ? window.__pdfResultWindow
-        : null;
-
-      if (targetWindow) {
-        targetWindow.location.href = viewURL;  // Blob URLへ遷移（Load Failed回避）
-      } else {
-        targetWindow = window.open(viewURL, '_blank');
-        if (targetWindow) {
-          window.__pdfResultWindow = targetWindow;
-        } else {
-          console.warn('Display window blocked by popup blocker');
-          document.getElementById('driveStatus').textContent = '⚠️ 表示ウィンドウがブロックされました';
-        }
-      }
-
-      // === スプレッドシート保存（表示モードボタン直接押し時のみ） ===
-      if (name && date && exercisesData.length > 0) {
-        await sendTraining(date, name, exercisesData);
-        document.getElementById('driveStatus').textContent = '✅ 保存成功';
-      }
-    });
-
-    // ✅ メモ入力 → 2秒後に自動保存
-    document.getElementById('trainerMemo').addEventListener('input', () => {
-      const name = document.getElementById('clientName').value.trim();
-      if (name) {
-        const memo = document.getElementById('trainerMemo').value;
-        localStorage.setItem('memo_' + name, memo);
-        scheduleMemoSave(name, memo);
-      }
-    });
-
-    document.getElementById('clientName').addEventListener('input', () => {
-      const name = document.getElementById('clientName').value;
-      document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + name) || '';
-    });
-
-    addExercise();
-
-    // ページ読み込み時にスプシから自動取得
-    loadFromServer();
   </script>
 </body>
 </html>
