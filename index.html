@@ -271,6 +271,22 @@
         return;
       }
 
+      // ★ ユーザー操作の直後（await前）にウィンドウを開く ★
+      // → ここで開かないとSafari/iOSのポップアップブロッカーに引っかかる
+      const loadingWindow = window.open('', '_blank');
+      if (loadingWindow) {
+        loadingWindow.document.write(
+          '<html><head><title>保存中...</title></head>'
+          + '<body style="font-family:Helvetica Neue,sans-serif;padding:60px;text-align:center;background:#f9f9f9;">'
+          + '<div style="font-size:48px;margin-bottom:20px;">⏳</div>'
+          + '<h2 style="color:#1a237e;">スプシ＆PDFを保存中...</h2>'
+          + '<p style="color:#555;margin-top:12px;">しばらくお待ちください</p>'
+          + '</body></html>'
+        );
+        loadingWindow.document.close();
+        window.__pdfResultWindow = loadingWindow;
+      }
+
       document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
 
       // メモをスプシに保存
@@ -533,22 +549,25 @@
         }
       });
 
-      // === 1) 表示モードウィンドウを開く（ローディングメッセージ付き） ===
+      // === 1) 表示モードウィンドウにコンテンツを書き込む ===
       const viewHTML = '<html><head><title>トレーニング記録</title></head>'
         + '<body style="font-family:Segoe UI,Helvetica Neue,sans-serif;padding:40px;background:white;color:#111;">'
-        + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#e8f5e9;border:2px solid #4caf50;padding:15px 20px;border-radius:8px;font-weight:bold;color:#2e7d32;display:none;z-index:9999;">📄 PDF生成中...</div>'
+        + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;display:block;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
         + displayBody + '</body></html>';
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(viewHTML);
-        newWindow.document.close();
 
-        // PDF保存完了後、newWindowにメッセージを送信
-        window.__pdfResultWindow = newWindow;
+      // 保存ボタン経由で開いたウィンドウがあればそれを使い、なければ新規で開く
+      let targetWindow = (window.__pdfResultWindow && !window.__pdfResultWindow.closed)
+        ? window.__pdfResultWindow
+        : window.open('', '_blank');
+
+      if (targetWindow) {
+        targetWindow.document.open();
+        targetWindow.document.write(viewHTML);
+        targetWindow.document.close();
+        window.__pdfResultWindow = targetWindow;
       } else {
-        // ウィンドウがブロックされた場合、ユーザーに警告を表示
         console.warn('Display window blocked by popup blocker');
-        document.getElementById('driveStatus').textContent = '⚠️ 表示モードウィンドウがブロックされました。ポップアップ許可設定を確認してください';
+        document.getElementById('driveStatus').textContent = '⚠️ 表示ウィンドウがブロックされました';
       }
 
       // === 2) スプレッドシート保存 ＋ PDF生成（iframe内で実行） ===
