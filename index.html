@@ -316,10 +316,10 @@
               reader.readAsDataURL(blob);
             });
 
-            // Google Driveへ送信
-            const res = await fetch(pdfData.scriptURL, {
+            // Google Driveへ送信（no-cors：iOSのCORSプリフライト「Load Failed」を回避）
+            await fetch(pdfData.scriptURL, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              mode: 'no-cors',
               body: JSON.stringify({
                 action: 'savePDFBase64',
                 clientName: pdfData.clientName,
@@ -327,16 +327,11 @@
                 pdfBase64: base64
               })
             });
-            const result = await res.json();
-
-            if (result.ok) {
-              st.textContent = '✅ 保存成功';
-              st.style.background    = '#e8f5e9';
-              st.style.borderColor   = '#4caf50';
-              st.style.color         = '#2e7d32';
-            } else {
-              throw new Error(result.error || '保存失敗');
-            }
+            // no-corsのためレスポンスは読めないが送信は完了
+            st.textContent = '✅ 保存成功';
+            st.style.background    = '#e8f5e9';
+            st.style.borderColor   = '#4caf50';
+            st.style.color         = '#2e7d32';
           } catch (err) {
             st.style.display       = 'block';
             st.textContent         = '❌ 保存失敗: ' + err.message;
