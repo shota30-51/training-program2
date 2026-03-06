@@ -545,6 +545,10 @@
 
         // PDF保存完了後、newWindowにメッセージを送信
         window.__pdfResultWindow = newWindow;
+      } else {
+        // ウィンドウがブロックされた場合、ユーザーに警告を表示
+        console.warn('Display window blocked by popup blocker');
+        document.getElementById('driveStatus').textContent = '⚠️ 表示モードウィンドウがブロックされました。ポップアップ許可設定を確認してください';
       }
 
       // === 2) スプレッドシート保存 ＋ PDF生成（iframe内で実行） ===
@@ -637,6 +641,7 @@
           document.getElementById('driveStatus').textContent = success ? '✅ PDF保存完了' : ('❌ PDF失敗: ' + (result.error || 'unknown error'));
 
           // 表示モードウィンドウに通知
+          let displayWindowNotified = false;
           if (window.__pdfResultWindow && !window.__pdfResultWindow.closed) {
             try {
               const statusEl = window.__pdfResultWindow.document.getElementById('pdfStatus');
@@ -653,8 +658,18 @@
                   statusEl.style.color = '#c62828';
                   statusEl.style.borderColor = '#f44336';
                 }
+                displayWindowNotified = true;
               }
             } catch(e) { /* 別ウィンドウアクセス失敗は無視 */ }
+          }
+
+          // ウィンドウがない場合、メインウィンドウのdriveStatusに表示
+          if (!displayWindowNotified) {
+            if (success) {
+              document.getElementById('driveStatus').textContent = '✅ PDF保存完了';
+            } else {
+              document.getElementById('driveStatus').textContent = '❌ PDF失敗: ' + (result.error || 'unknown error');
+            }
           }
 
         } catch(err) {
@@ -662,6 +677,7 @@
           document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
 
           // 表示モードウィンドウにエラー通知
+          let displayWindowErrorNotified = false;
           if (window.__pdfResultWindow && !window.__pdfResultWindow.closed) {
             try {
               const statusEl = window.__pdfResultWindow.document.getElementById('pdfStatus');
@@ -671,8 +687,14 @@
                 statusEl.style.background = '#ffebee';
                 statusEl.style.color = '#c62828';
                 statusEl.style.borderColor = '#f44336';
+                displayWindowErrorNotified = true;
               }
             } catch(e) { /* 別ウィンドウアクセス失敗は無視 */ }
+          }
+
+          // ウィンドウがない場合、メインウィンドウのdriveStatusに表示
+          if (!displayWindowErrorNotified) {
+            document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
           }
 
           const f = document.getElementById('pdfFrame');
