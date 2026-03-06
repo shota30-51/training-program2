@@ -583,7 +583,7 @@
           if (!h2p) throw new Error('html2pdf初期化失敗');
 
           const pdfBlob = await h2p().set({
-            margin: [10, 8, 10, 8],
+            margin: 10,
             image: { type: 'jpeg', quality: 0.95 },
             html2canvas: {
               scale: 2,
