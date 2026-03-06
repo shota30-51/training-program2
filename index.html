@@ -529,37 +529,46 @@
         await sendTraining(date, name, exercisesData);
 
         // ブラウザでPDF生成 → Driveへ送信
-        // ローディングオーバーレイを表示（html2canvasは画面内の要素が必要）
-        const overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(255,255,255,0.95);z-index:10001;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:bold;color:#333;';
-        overlay.textContent = '📄 PDF生成中... しばらくお待ちください';
-        document.body.appendChild(overlay);
+        document.getElementById('driveStatus').textContent = '📄 PDF生成中...';
 
         const parsed = new DOMParser().parseFromString(content, 'text/html');
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:white;z-index:10000;';
+        // html2canvasが正しく描画するため、画面内に配置（z-index最前面）
+        wrap.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:white;z-index:9999;overflow:hidden;';
 
         const styleEl = document.createElement('style');
         styleEl.textContent = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent).join('\n');
         wrap.appendChild(styleEl);
         Array.from(document.importNode(parsed.body, true).childNodes).forEach(n => wrap.appendChild(n));
-
         document.body.appendChild(wrap);
-        await new Promise(r => setTimeout(r, 400));
 
-        // 1ページに収まるよう自動縮小
-        const ratio = Math.min(1, 980 / wrap.scrollHeight);
-        if (ratio < 1) wrap.style.zoom = (ratio * 100).toFixed(1) + '%';
-        await new Promise(r => setTimeout(r, 100));
+        // 描画待ち
+        await new Promise(r => setTimeout(r, 600));
+
+        // 1ページに収まるよう高さからscaleを計算
+        const pageH = 1050;
+        const contentH = wrap.scrollHeight;
+        const pdfScale = contentH > pageH ? pageH / contentH : 1;
 
         try {
           const blob = await html2pdf().set({
             margin: 8,
-            html2canvas: { scale: 1.5, useCORS: true, logging: false, windowWidth: 794 },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            html2canvas: {
+              scale: 2,
+              useCORS: true,
+              logging: false,
+              windowWidth: 794,
+              windowHeight: contentH
+            },
+            jsPDF: {
+              unit: 'mm',
+              format: contentH > pageH
+                ? [210, Math.round(210 * contentH / 794)]  // 全内容が入るページサイズ
+                : 'a4',
+              orientation: 'portrait'
+            }
           }).from(wrap).outputPdf('blob');
           document.body.removeChild(wrap);
-          document.body.removeChild(overlay);
 
           const base64 = await new Promise(r => {
             const reader = new FileReader();
@@ -575,7 +584,6 @@
           document.getElementById('driveStatus').textContent = result.ok ? '✅ PDF保存完了' : '❌ PDF失敗';
         } catch(err) {
           try { document.body.removeChild(wrap); } catch(e2) {}
-          try { document.body.removeChild(overlay); } catch(e2) {}
           console.error(err);
           document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
         }
