@@ -549,13 +549,69 @@
         }
       });
 
-      // === 1) 表示モードウィンドウにコンテンツを書き込む ===
-      const viewHTML = '<html><head><title>トレーニング記録</title></head>'
-        + '<body style="font-family:Segoe UI,Helvetica Neue,sans-serif;padding:40px;background:white;color:#111;">'
-        + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;display:block;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
-        + displayBody + '</body></html>';
+      // === PDF生成スクリプト（表示ウィンドウ内で実行） ===
+      // iOS/iPadOSではバックグラウンドタブのJSが停止するため、
+      // アクティブな表示ウィンドウ自身にPDF生成を担わせる
+      const clientNameSafe = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const pdfScript = '(function(){'
+        + 'var SCRIPT_URL=\'' + SCRIPT_URL + '\';'
+        + 'var CLIENT_NAME=\'' + clientNameSafe + '\';'
+        + 'var DATE=\'' + date + '\';'
+        + 'async function run(){'
+        + '  var st=document.getElementById(\'pdfStatus\');'
+        + '  try{'
+        + '    await new Promise(function(ok,ng){'
+        + '      var s=document.createElement(\'script\');'
+        + '      s.src=\'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js\';'
+        + '      s.onload=ok;'
+        + '      s.onerror=function(){ng(new Error(\'ライブラリ読込失敗\'))};'
+        + '      document.head.appendChild(s);'
+        + '    });'
+        + '    st.style.display=\'none\';'
+        + '    var blob=await html2pdf().set({'
+        + '      margin:10,'
+        + '      image:{type:\'jpeg\',quality:0.95},'
+        + '      html2canvas:{scale:1,useCORS:true,backgroundColor:\'#ffffff\'},'
+        + '      jsPDF:{unit:\'mm\',format:\'a4\',orientation:\'portrait\'}'
+        + '    }).from(document.getElementById(\'pdfContent\')).outputPdf(\'blob\');'
+        + '    st.style.display=\'block\';st.textContent=\'📤 アップロード中...\';'
+        + '    var b64=await new Promise(function(ok,ng){'
+        + '      var r=new FileReader();'
+        + '      r.onload=function(e){ok(e.target.result.split(\',\')[1])};'
+        + '      r.onerror=function(){ng(new Error(\'変換失敗\'))};'
+        + '      r.readAsDataURL(blob);'
+        + '    });'
+        + '    var res=await fetch(SCRIPT_URL,{'
+        + '      method:\'POST\','
+        + '      headers:{\'Content-Type\':\'application/json\'},'
+        + '      body:JSON.stringify({action:\'savePDFBase64\',clientName:CLIENT_NAME,date:DATE,pdfBase64:b64})'
+        + '    });'
+        + '    var result=await res.json();'
+        + '    if(result.ok){'
+        + '      st.textContent=\'✅ PDF保存完了\';'
+        + '      st.style.background=\'#e8f5e9\';st.style.borderColor=\'#4caf50\';st.style.color=\'#2e7d32\';'
+        + '    }else{throw new Error(result.error||\'保存失敗\')}'
+        + '  }catch(e){'
+        + '    st.style.display=\'block\';'
+        + '    st.textContent=\'❌ \'+e.message;'
+        + '    st.style.background=\'#ffebee\';st.style.borderColor=\'#f44336\';st.style.color=\'#c62828\';'
+        + '  }'
+        + '}'
+        + 'if(document.readyState===\'complete\'){setTimeout(run,500)}'
+        + 'else{window.addEventListener(\'load\',function(){setTimeout(run,500)})}'
+        + '})();';
 
-      // 保存ボタン経由で開いたウィンドウがあればそれを使い、なければ新規で開く
+      // === 表示ウィンドウのHTML（スクリプト埋め込み） ===
+      const viewHTML = '<!DOCTYPE html><html><head><title>トレーニング記録</title><meta charset="UTF-8"></head>'
+        + '<body style="font-family:Segoe UI,Helvetica Neue,sans-serif;background:white;color:#111;margin:0;">'
+        + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
+        + '<div id="pdfContent" style="padding:40px;">'
+        + displayBody
+        + '</div>'
+        + '<scr' + 'ipt>' + pdfScript + '</scr' + 'ipt>'
+        + '</body></html>';
+
+      // === 表示ウィンドウに書き込む ===
       let targetWindow = (window.__pdfResultWindow && !window.__pdfResultWindow.closed)
         ? window.__pdfResultWindow
         : window.open('', '_blank');
@@ -570,155 +626,10 @@
         document.getElementById('driveStatus').textContent = '⚠️ 表示ウィンドウがブロックされました';
       }
 
-      // === 2) スプレッドシート保存 ＋ PDF生成（iframe内で実行） ===
+      // === スプレッドシート保存（表示モードボタン直接押し時のみ） ===
       if (name && date && exercisesData.length > 0) {
         await sendTraining(date, name, exercisesData);
-
-        document.getElementById('driveStatus').textContent = '📄 PDF生成中...';
-
-        try {
-          // --- iframe を作成してコンテンツを描画 ---
-          const iframe = document.createElement('iframe');
-          iframe.id = 'pdfFrame';
-          iframe.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1123px;z-index:99999;border:none;background:white;';
-          document.body.appendChild(iframe);
-
-          const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-          iDoc.open();
-          iDoc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{box-sizing:border-box;margin:0;padding:0;}</style></head>'
-            + '<body style="padding:40px;background:white;color:#111;font-family:Segoe UI,Helvetica Neue,sans-serif;">'
-            + displayBody
-            + '</body></html>');
-          iDoc.close();
-
-          // iframe内のコンテンツが描画されるまで待機
-          await new Promise(r => setTimeout(r, 2000));
-
-          // iframeの高さをコンテンツに合わせる
-          const contentH = iDoc.body.scrollHeight;
-          iframe.style.height = (contentH + 80) + 'px';
-          await new Promise(r => setTimeout(r, 500));
-
-          document.getElementById('driveStatus').textContent = '📄 ライブラリ読込中...';
-
-          // --- html2pdf.js を iframe 内に読み込み ---
-          await new Promise((resolve, reject) => {
-            const s = iDoc.createElement('script');
-            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-            s.onload = resolve;
-            s.onerror = () => reject(new Error('html2pdf.js読み込み失敗'));
-            iDoc.head.appendChild(s);
-          });
-          await new Promise(r => setTimeout(r, 500));
-
-          document.getElementById('driveStatus').textContent = '📄 PDF変換中...';
-
-          // --- iframe 内の html2pdf で PDF 生成 ---
-          const h2p = iframe.contentWindow.html2pdf;
-          if (!h2p) throw new Error('html2pdf初期化失敗');
-
-          const pdfBlob = await h2p().set({
-            margin: 10,
-            image: { type: 'jpeg', quality: 0.95 },
-            html2canvas: {
-              scale: 2,
-              useCORS: true,
-              logging: false,
-              backgroundColor: '#ffffff'
-            },
-            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          }).from(iDoc.body).outputPdf('blob');
-
-          // iframe を削除
-          iframe.remove();
-
-          console.log('PDF blob size:', pdfBlob.size, 'bytes');
-
-          document.getElementById('driveStatus').textContent = '📄 アップロード中...';
-
-          // base64に変換
-          const base64 = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = e => resolve(e.target.result.split(',')[1]);
-            reader.onerror = () => reject(new Error('base64変換失敗'));
-            reader.readAsDataURL(pdfBlob);
-          });
-
-          // サーバーに送信
-          const res = await fetch(SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'savePDFBase64', clientName: name, date, pdfBase64: base64 })
-          });
-
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-          }
-
-          const result = await res.json();
-          const success = result.ok;
-          document.getElementById('driveStatus').textContent = success ? '✅ PDF保存完了' : ('❌ PDF失敗: ' + (result.error || 'unknown error'));
-
-          // 表示モードウィンドウに通知
-          let displayWindowNotified = false;
-          if (window.__pdfResultWindow && !window.__pdfResultWindow.closed) {
-            try {
-              const statusEl = window.__pdfResultWindow.document.getElementById('pdfStatus');
-              if (statusEl) {
-                statusEl.style.display = 'block';
-                if (success) {
-                  statusEl.textContent = '✅ PDF保存完了';
-                  statusEl.style.background = '#e8f5e9';
-                  statusEl.style.color = '#2e7d32';
-                  statusEl.style.borderColor = '#4caf50';
-                } else {
-                  statusEl.textContent = '❌ PDF保存失敗';
-                  statusEl.style.background = '#ffebee';
-                  statusEl.style.color = '#c62828';
-                  statusEl.style.borderColor = '#f44336';
-                }
-                displayWindowNotified = true;
-              }
-            } catch(e) { /* 別ウィンドウアクセス失敗は無視 */ }
-          }
-
-          // ウィンドウがない場合、メインウィンドウのdriveStatusに表示
-          if (!displayWindowNotified) {
-            if (success) {
-              document.getElementById('driveStatus').textContent = '✅ PDF保存完了';
-            } else {
-              document.getElementById('driveStatus').textContent = '❌ PDF失敗: ' + (result.error || 'unknown error');
-            }
-          }
-
-        } catch(err) {
-          console.error('PDF error:', err);
-          document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
-
-          // 表示モードウィンドウにエラー通知
-          let displayWindowErrorNotified = false;
-          if (window.__pdfResultWindow && !window.__pdfResultWindow.closed) {
-            try {
-              const statusEl = window.__pdfResultWindow.document.getElementById('pdfStatus');
-              if (statusEl) {
-                statusEl.style.display = 'block';
-                statusEl.textContent = '❌ ' + err.message;
-                statusEl.style.background = '#ffebee';
-                statusEl.style.color = '#c62828';
-                statusEl.style.borderColor = '#f44336';
-                displayWindowErrorNotified = true;
-              }
-            } catch(e) { /* 別ウィンドウアクセス失敗は無視 */ }
-          }
-
-          // ウィンドウがない場合、メインウィンドウのdriveStatusに表示
-          if (!displayWindowErrorNotified) {
-            document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
-          }
-
-          const f = document.getElementById('pdfFrame');
-          if (f) f.remove();
-        }
+        document.getElementById('driveStatus').textContent = '✅ スプシ保存完了（PDF処理は別タブ）';
       }
     });
 
