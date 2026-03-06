@@ -249,21 +249,23 @@
 
     // === 表示用HTML生成（データオブジェクトから構築） ===
     function buildDisplayBody(clientName, date, exercisesData) {
-      let body = '';
-      body += '<h1 style="text-align:center;background:linear-gradient(to right,#1a237e,#0d47a1);color:white;padding:20px;border-radius:8px;font-size:24px;margin:0 0 20px 0;letter-spacing:1px;font-family:Segoe UI,Helvetica Neue,sans-serif;">トレーニングプログラム記録</h1>';
-      body += '<div style="display:flex;justify-content:space-between;margin:20px 0;font-size:18px;font-family:Segoe UI,Helvetica Neue,sans-serif;">';
-      body += '<div>クライアント名：' + (clientName ? clientName + ' 様' : '') + '</div>';
-      body += '<div>日付：' + (date || '') + '</div>';
-      body += '</div>';
+      var f = 'font-family:Helvetica,Arial,sans-serif;';
+      var body = '';
+      body += '<h1 style="text-align:center;background:#1a237e;color:white;padding:20px;border-radius:8px;font-size:22px;margin:0 0 20px 0;' + f + '">トレーニングプログラム記録</h1>';
+      // display:flex は html2canvas が苦手なため table に変更
+      body += '<table style="width:100%;margin-bottom:20px;font-size:16px;' + f + '">';
+      body += '<tr><td>クライアント名：' + (clientName ? clientName + ' 様' : '') + '</td>';
+      body += '<td style="text-align:right;">日付：' + (date || '') + '</td></tr>';
+      body += '</table>';
       exercisesData.forEach(function(ex) {
-        body += '<div style="border:1px solid #ccc;padding:20px;border-radius:12px;margin-bottom:20px;background-color:#f9f9f9;font-family:Segoe UI,Helvetica Neue,sans-serif;">';
-        body += '<strong>' + ex.part + '：' + ex.name + '</strong><br>';
+        body += '<div style="border:1px solid #999;padding:16px;border-radius:10px;margin-bottom:16px;background:#f9f9f9;' + f + '">';
+        body += '<p style="font-weight:bold;margin:0 0 8px 0;font-size:16px;">' + ex.part + '：' + ex.name + '</p>';
         (ex.sets || []).forEach(function(s, i) {
-          const w = parseFloat(s.weight);
-          body += '<div style="margin-left:20px;padding:2px 0;">セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg × ' + (s.reps || '-') + '回</div>';
+          var w = parseFloat(s.weight);
+          body += '<p style="margin:4px 0 4px 20px;font-size:15px;">セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg × ' + (s.reps || '-') + '回</p>';
         });
         if (ex.remarks) {
-          body += '<div style="color:#c62828;font-size:15px;white-space:pre-wrap;margin-top:10px;">備考：' + ex.remarks + '</div>';
+          body += '<p style="color:#c62828;font-size:14px;margin:8px 0 0 0;white-space:pre-wrap;">備考：' + ex.remarks + '</p>';
         }
         body += '</div>';
       });
@@ -296,14 +298,25 @@
               document.head.appendChild(s);
             });
 
-            // PDF生成（pdfStatusを隠してから生成）
+            // PDF生成前にDOMレンダリングが完了するまで待機（iOS対策）
             st.style.display = 'none';
+            await new Promise(function(r) { setTimeout(r, 800); });
+
+            const el = document.getElementById('pdfContent');
             const blob = await html2pdf().set({
               margin: 10,
               image: { type: 'jpeg', quality: 0.95 },
-              html2canvas: { scale: 1, useCORS: true, backgroundColor: '#ffffff' },
+              html2canvas: {
+                scale: 2,
+                useCORS: false,
+                backgroundColor: '#ffffff',
+                scrollX: 0,
+                scrollY: 0,
+                windowWidth: 800,
+                logging: false
+              },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(document.getElementById('pdfContent')).outputPdf('blob');
+            }).from(el).outputPdf('blob');
 
             st.style.display = 'block';
             st.textContent = '📤 アップロード中...';
