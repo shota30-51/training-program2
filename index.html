@@ -255,7 +255,7 @@
       await postToServer({ action: 'saveTraining', date, clientName, exercises });
     }
 
-    // ✅ 手動「今すぐ保存」ボタン：メモ＋現在の種目を送信
+    // ✅ 手動「保存」ボタン：メモ＆種目保存 → 表示モード＋PDF生成を実行
     async function saveToServer() {
       const clientName = document.getElementById('clientName').value.trim();
       const date       = document.getElementById('trainingDate').value;
@@ -266,18 +266,26 @@
         return;
       }
 
-      document.getElementById('driveStatus').textContent = '💾 保存中...';
+      if (!date) {
+        document.getElementById('driveStatus').textContent = '⚠️ 日付を選択してください';
+        return;
+      }
 
-      // メモ保存
+      document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
+
+      // メモをスプシに保存
       if (memo) {
         await postToServer({ action: 'saveMemo', clientName, memo });
       }
 
-      // 種目データを収集して保存
+      // 種目データをスプシに保存
       const exercisesData = collectExercises();
-      if (exercisesData.length > 0 && date) {
+      if (exercisesData.length > 0) {
         await postToServer({ action: 'saveTraining', date, clientName, exercises: exercisesData });
       }
+
+      // その後、表示モード＋PDF保存を実行
+      document.getElementById('viewModeBtn').click();
     }
 
     // ✅ 共通送信関数（GET + no-cors でURLパラメータ送信）
@@ -525,14 +533,18 @@
         }
       });
 
-      // === 1) 表示モードウィンドウを開く（閲覧用のみ、PDFスクリプトなし） ===
+      // === 1) 表示モードウィンドウを開く（ローディングメッセージ付き） ===
       const viewHTML = '<html><head><title>トレーニング記録</title></head>'
         + '<body style="font-family:Segoe UI,Helvetica Neue,sans-serif;padding:40px;background:white;color:#111;">'
+        + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#e8f5e9;border:2px solid #4caf50;padding:15px 20px;border-radius:8px;font-weight:bold;color:#2e7d32;display:none;z-index:9999;">📄 PDF生成中...</div>'
         + displayBody + '</body></html>';
       const newWindow = window.open('', '_blank');
       if (newWindow) {
         newWindow.document.write(viewHTML);
         newWindow.document.close();
+
+        // PDF保存完了後、newWindowにメッセージを送信
+        window.__pdfResultWindow = newWindow;
       }
 
       // === 2) スプレッドシート保存 ＋ PDF生成（iframe内で実行） ===
@@ -612,14 +624,57 @@
           // サーバーに送信
           const res = await fetch(SCRIPT_URL, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'savePDFBase64', clientName: name, date, pdfBase64: base64 })
           });
+
+          if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+          }
+
           const result = await res.json();
-          document.getElementById('driveStatus').textContent = result.ok ? '✅ PDF保存完了' : '❌ PDF失敗';
+          const success = result.ok;
+          document.getElementById('driveStatus').textContent = success ? '✅ PDF保存完了' : ('❌ PDF失敗: ' + (result.error || 'unknown error'));
+
+          // 表示モードウィンドウに通知
+          if (window.__pdfResultWindow && !window.__pdfResultWindow.closed) {
+            try {
+              const statusEl = window.__pdfResultWindow.document.getElementById('pdfStatus');
+              if (statusEl) {
+                statusEl.style.display = 'block';
+                if (success) {
+                  statusEl.textContent = '✅ PDF保存完了';
+                  statusEl.style.background = '#e8f5e9';
+                  statusEl.style.color = '#2e7d32';
+                  statusEl.style.borderColor = '#4caf50';
+                } else {
+                  statusEl.textContent = '❌ PDF保存失敗';
+                  statusEl.style.background = '#ffebee';
+                  statusEl.style.color = '#c62828';
+                  statusEl.style.borderColor = '#f44336';
+                }
+              }
+            } catch(e) { /* 別ウィンドウアクセス失敗は無視 */ }
+          }
 
         } catch(err) {
           console.error('PDF error:', err);
           document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
+
+          // 表示モードウィンドウにエラー通知
+          if (window.__pdfResultWindow && !window.__pdfResultWindow.closed) {
+            try {
+              const statusEl = window.__pdfResultWindow.document.getElementById('pdfStatus');
+              if (statusEl) {
+                statusEl.style.display = 'block';
+                statusEl.textContent = '❌ ' + err.message;
+                statusEl.style.background = '#ffebee';
+                statusEl.style.color = '#c62828';
+                statusEl.style.borderColor = '#f44336';
+              }
+            } catch(e) { /* 別ウィンドウアクセス失敗は無視 */ }
+          }
+
           const f = document.getElementById('pdfFrame');
           if (f) f.remove();
         }
