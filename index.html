@@ -535,52 +535,71 @@
         newWindow.document.close();
       }
 
-      // === 2) スプレッドシート保存 ＋ PDF生成（メインウィンドウで実行） ===
+      // === 2) スプレッドシート保存 ＋ PDF生成（iframe内で実行） ===
       if (name && date && exercisesData.length > 0) {
         await sendTraining(date, name, exercisesData);
 
         document.getElementById('driveStatus').textContent = '📄 PDF生成中...';
 
         try {
-          // html2pdf.js を読み込み
-          await loadHtml2PdfLib();
+          // --- iframe を作成してコンテンツを描画 ---
+          const iframe = document.createElement('iframe');
+          iframe.id = 'pdfFrame';
+          iframe.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:1123px;z-index:99999;border:none;background:white;';
+          document.body.appendChild(iframe);
 
-          // メインウィンドウに一時的な表示用divを作成
-          const wrap = document.createElement('div');
-          wrap.id = 'pdfCaptureWrap';
-          wrap.style.cssText = 'position:fixed;top:0;left:0;width:794px;background:white;z-index:99999;padding:40px;box-sizing:border-box;color:#111;overflow:visible;';
-          wrap.innerHTML = displayBody;
-          document.body.appendChild(wrap);
+          const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+          iDoc.open();
+          iDoc.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{box-sizing:border-box;margin:0;padding:0;}</style></head>'
+            + '<body style="padding:40px;background:white;color:#111;font-family:Segoe UI,Helvetica Neue,sans-serif;">'
+            + displayBody
+            + '</body></html>');
+          iDoc.close();
 
-          // ブラウザが完全に描画するまで待機（2フレーム＋2秒）
-          await new Promise(resolve => {
-            requestAnimationFrame(() => {
-              requestAnimationFrame(() => {
-                setTimeout(resolve, 2000);
-              });
-            });
+          // iframe内のコンテンツが描画されるまで待機
+          await new Promise(r => setTimeout(r, 2000));
+
+          // iframeの高さをコンテンツに合わせる
+          const contentH = iDoc.body.scrollHeight;
+          iframe.style.height = (contentH + 80) + 'px';
+          await new Promise(r => setTimeout(r, 500));
+
+          document.getElementById('driveStatus').textContent = '📄 ライブラリ読込中...';
+
+          // --- html2pdf.js を iframe 内に読み込み ---
+          await new Promise((resolve, reject) => {
+            const s = iDoc.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            s.onload = resolve;
+            s.onerror = () => reject(new Error('html2pdf.js読み込み失敗'));
+            iDoc.head.appendChild(s);
           });
+          await new Promise(r => setTimeout(r, 500));
 
-          // デバッグ: divのサイズを確認
-          console.log('PDF wrap size:', wrap.scrollWidth, 'x', wrap.scrollHeight, '/ innerHTML length:', wrap.innerHTML.length);
+          document.getElementById('driveStatus').textContent = '📄 PDF変換中...';
 
-          // PDF生成（html2pdf.jsで自動ページ分割）
-          const pdfBlob = await html2pdf().set({
+          // --- iframe 内の html2pdf で PDF 生成 ---
+          const h2p = iframe.contentWindow.html2pdf;
+          if (!h2p) throw new Error('html2pdf初期化失敗');
+
+          const pdfBlob = await h2p().set({
             margin: [10, 8, 10, 8],
             image: { type: 'jpeg', quality: 0.95 },
             html2canvas: {
               scale: 2,
               useCORS: true,
               logging: false,
-              backgroundColor: '#ffffff',
-              scrollX: 0,
-              scrollY: 0
+              backgroundColor: '#ffffff'
             },
             jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-          }).from(wrap).outputPdf('blob');
+          }).from(iDoc.body).outputPdf('blob');
 
-          // 一時divを削除
-          wrap.remove();
+          // iframe を削除
+          iframe.remove();
+
+          console.log('PDF blob size:', pdfBlob.size, 'bytes');
+
+          document.getElementById('driveStatus').textContent = '📄 アップロード中...';
 
           // base64に変換
           const base64 = await new Promise((resolve, reject) => {
@@ -589,8 +608,6 @@
             reader.onerror = () => reject(new Error('base64変換失敗'));
             reader.readAsDataURL(pdfBlob);
           });
-
-          console.log('PDF base64 length:', base64.length);
 
           // サーバーに送信
           const res = await fetch(SCRIPT_URL, {
@@ -603,9 +620,8 @@
         } catch(err) {
           console.error('PDF error:', err);
           document.getElementById('driveStatus').textContent = '❌ PDF保存失敗: ' + err.message;
-          // クリーンアップ
-          const w = document.getElementById('pdfCaptureWrap');
-          if (w) w.remove();
+          const f = document.getElementById('pdfFrame');
+          if (f) f.remove();
         }
       }
     });
