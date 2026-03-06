@@ -272,18 +272,17 @@
       }
 
       // ★ ユーザー操作の直後（await前）にウィンドウを開く ★
-      // → ここで開かないとSafari/iOSのポップアップブロッカーに引っかかる
-      const loadingWindow = window.open('', '_blank');
+      // document.write()はiOSでLoad Failedになるため Blob URLを使用
+      const loadingHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>保存中...</title></head>'
+        + '<body style="font-family:Helvetica Neue,sans-serif;padding:60px;text-align:center;background:#f9f9f9;">'
+        + '<div style="font-size:48px;margin-bottom:20px;">⏳</div>'
+        + '<h2 style="color:#1a237e;">スプシ＆PDFを保存中...</h2>'
+        + '<p style="color:#555;margin-top:12px;">しばらくお待ちください</p>'
+        + '</body></html>';
+      const loadingBlob = new Blob([loadingHTML], { type: 'text/html' });
+      const loadingURL  = URL.createObjectURL(loadingBlob);
+      const loadingWindow = window.open(loadingURL, '_blank');
       if (loadingWindow) {
-        loadingWindow.document.write(
-          '<html><head><title>保存中...</title></head>'
-          + '<body style="font-family:Helvetica Neue,sans-serif;padding:60px;text-align:center;background:#f9f9f9;">'
-          + '<div style="font-size:48px;margin-bottom:20px;">⏳</div>'
-          + '<h2 style="color:#1a237e;">スプシ＆PDFを保存中...</h2>'
-          + '<p style="color:#555;margin-top:12px;">しばらくお待ちください</p>'
-          + '</body></html>'
-        );
-        loadingWindow.document.close();
         window.__pdfResultWindow = loadingWindow;
       }
 
@@ -310,7 +309,7 @@
         const url = SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
         await fetch(url, { mode: 'no-cors' });
         const now = new Date().toLocaleTimeString('ja-JP');
-        document.getElementById('driveStatus').textContent = `✅ 保存完了 ${now}`;
+        document.getElementById('driveStatus').textContent = `✅ 保存成功 ${now}`;
       } catch(err) {
         console.error('Save error:', err);
         document.getElementById('driveStatus').textContent = '❌ 保存失敗';
@@ -588,12 +587,12 @@
         + '    });'
         + '    var result=await res.json();'
         + '    if(result.ok){'
-        + '      st.textContent=\'✅ PDF保存完了\';'
+        + '      st.textContent=\'✅ 保存成功\';'
         + '      st.style.background=\'#e8f5e9\';st.style.borderColor=\'#4caf50\';st.style.color=\'#2e7d32\';'
         + '    }else{throw new Error(result.error||\'保存失敗\')}'
         + '  }catch(e){'
         + '    st.style.display=\'block\';'
-        + '    st.textContent=\'❌ \'+e.message;'
+        + '    st.textContent=\'❌ 保存失敗: \'+e.message;'
         + '    st.style.background=\'#ffebee\';st.style.borderColor=\'#f44336\';st.style.color=\'#c62828\';'
         + '  }'
         + '}'
@@ -602,6 +601,7 @@
         + '})();';
 
       // === 表示ウィンドウのHTML（スクリプト埋め込み） ===
+      // document.write()はiOSでLoad Failedになるため Blob URLで表示
       const viewHTML = '<!DOCTYPE html><html><head><title>トレーニング記録</title><meta charset="UTF-8"></head>'
         + '<body style="font-family:Segoe UI,Helvetica Neue,sans-serif;background:white;color:#111;margin:0;">'
         + '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
@@ -611,25 +611,30 @@
         + '<scr' + 'ipt>' + pdfScript + '</scr' + 'ipt>'
         + '</body></html>';
 
-      // === 表示ウィンドウに書き込む ===
+      const viewBlob = new Blob([viewHTML], { type: 'text/html' });
+      const viewURL  = URL.createObjectURL(viewBlob);
+
+      // === 既存ウィンドウへ遷移 or 新規で開く ===
       let targetWindow = (window.__pdfResultWindow && !window.__pdfResultWindow.closed)
         ? window.__pdfResultWindow
-        : window.open('', '_blank');
+        : null;
 
       if (targetWindow) {
-        targetWindow.document.open();
-        targetWindow.document.write(viewHTML);
-        targetWindow.document.close();
-        window.__pdfResultWindow = targetWindow;
+        targetWindow.location.href = viewURL;  // Blob URLへ遷移（Load Failed回避）
       } else {
-        console.warn('Display window blocked by popup blocker');
-        document.getElementById('driveStatus').textContent = '⚠️ 表示ウィンドウがブロックされました';
+        targetWindow = window.open(viewURL, '_blank');
+        if (targetWindow) {
+          window.__pdfResultWindow = targetWindow;
+        } else {
+          console.warn('Display window blocked by popup blocker');
+          document.getElementById('driveStatus').textContent = '⚠️ 表示ウィンドウがブロックされました';
+        }
       }
 
       // === スプレッドシート保存（表示モードボタン直接押し時のみ） ===
       if (name && date && exercisesData.length > 0) {
         await sendTraining(date, name, exercisesData);
-        document.getElementById('driveStatus').textContent = '✅ スプシ保存完了（PDF処理は別タブ）';
+        document.getElementById('driveStatus').textContent = '✅ 保存成功';
       }
     });
 
