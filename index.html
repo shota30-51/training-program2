@@ -345,6 +345,11 @@
             st.style.background    = '#e8f5e9';
             st.style.borderColor   = '#4caf50';
             st.style.color         = '#2e7d32';
+            setTimeout(function() {
+              st.style.transition = 'opacity 0.5s';
+              st.style.opacity = '0';
+              setTimeout(function() { st.remove(); }, 500);
+            }, 5000);
           } catch (err) {
             st.style.display       = 'block';
             st.textContent         = '❌ 保存失敗: ' + err.message;
