@@ -413,6 +413,7 @@
       }
 
       document.getElementById('driveStatus').textContent = '✅ 保存成功';
+      setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
     }
 
     // ✅ 種目の最高重量をlocalStorageに記録
@@ -435,6 +436,7 @@
         await fetch(url, { mode: 'no-cors' });
         const now = new Date().toLocaleTimeString('ja-JP');
         document.getElementById('driveStatus').textContent = `✅ 保存成功 ${now}`;
+        setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
       } catch(err) {
         console.error('Save error:', err);
         document.getElementById('driveStatus').textContent = '❌ 保存失敗';
@@ -454,6 +456,7 @@
 
         const now = new Date().toLocaleTimeString('ja-JP');
         document.getElementById('driveStatus').textContent = `✅ ${count}件読み込み完了 ${now}`;
+        setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
 
         // クライアント名が入力済みならメモを即反映
         const clientName = document.getElementById('clientName').value.trim();
@@ -474,7 +477,8 @@
         const part         = ex.querySelector('.body-part').value;
         const partOther    = ex.querySelector('.body-part-other');
         const partName     = part === 'その他' ? partOther.value : part;
-        const exerciseName = ex.querySelector('.exercise-name').value;
+        const exerciseNameInput = ex.querySelector('.exercise-name-other');
+        const exerciseName = part === 'その他' ? (exerciseNameInput ? exerciseNameInput.value : '') : ex.querySelector('.exercise-name').value;
         const remarks      = ex.querySelector('textarea[placeholder="備考"]').value;
         const setsData     = [];
 
@@ -526,6 +530,12 @@
       exerciseSelect.className = 'exercise-name';
       exerciseSelect.innerHTML = '<option value="" disabled selected>種目を選択</option>';
 
+      const exerciseInput = document.createElement('input');
+      exerciseInput.type = 'text';
+      exerciseInput.placeholder = '自由入力（種目）';
+      exerciseInput.className = 'exercise-name-other';
+      exerciseInput.style.cssText = 'padding:8px 12px;font-size:15px;border-radius:6px;border:1px solid #ccc;margin:5px 5px 5px 0;height:38px;display:none;';
+
       const maxWeightDisplay = document.createElement('div');
       maxWeightDisplay.className = 'max-weight';
 
@@ -533,9 +543,12 @@
         const selectedPart = bodyPartSelect.value;
         if (selectedPart === 'その他') {
           bodyPartInput.style.display = 'inline-block';
-          exerciseSelect.innerHTML = '<option value="" disabled selected>種目を選択</option>';
+          exerciseSelect.style.display = 'none';
+          exerciseInput.style.display = 'inline-block';
         } else {
           bodyPartInput.style.display = 'none';
+          exerciseSelect.style.display = '';
+          exerciseInput.style.display = 'none';
           const options = exerciseOptions[selectedPart] || [];
           exerciseSelect.innerHTML = '<option value="" disabled selected>種目を選択</option>' +
             options.map(name => `<option value="${name}">${name}</option>`).join('');
@@ -571,6 +584,7 @@
       exercise.appendChild(bodyPartSelect);
       exercise.appendChild(bodyPartInput);
       exercise.appendChild(exerciseSelect);
+      exercise.appendChild(exerciseInput);
       exercise.appendChild(maxWeightDisplay);
       exercise.appendChild(document.createElement('br'));
       exercise.appendChild(setsDiv);
