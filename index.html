@@ -757,9 +757,59 @@
         }
       });
 
+      // クライアント名入力 → 1秒後にスプシから該当データを再取得
+      let clientLoadTimer = null;
       document.getElementById('clientName').addEventListener('input', function() {
         const name = document.getElementById('clientName').value.trim();
+        // まずlocalStorageからメモを即反映
         document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalizeKey(name)) || '';
+        // 1秒後にスプシから最新データを取得（デバウンス）
+        clearTimeout(clientLoadTimer);
+        if (name) {
+          clientLoadTimer = setTimeout(async function() {
+            document.getElementById('driveStatus').textContent = '📂 データ読み込み中...';
+            try {
+              const res = await fetch(SCRIPT_URL);
+              const data = await res.json();
+              const normalized = normalizeKey(name);
+
+              // メモを更新（正規化キーでマージ）
+              Object.entries(data.memos || {}).forEach(([k, v]) => {
+                if (k.startsWith('memo_')) {
+                  const nk = 'memo_' + normalizeKey(k.substring(5));
+                  const existing = localStorage.getItem(nk);
+                  if (existing && v && existing !== v && !existing.includes(v)) {
+                    localStorage.setItem(nk, existing + '\n' + v);
+                  } else if (v) {
+                    localStorage.setItem(nk, v);
+                  }
+                }
+              });
+
+              // 重量を更新（正規化キーで最大値）
+              Object.entries(data.weights || {}).forEach(([k, v]) => {
+                if (k.startsWith('record_')) {
+                  const rest = k.substring(7);
+                  const lastU = rest.lastIndexOf('_');
+                  if (lastU > 0) {
+                    const nk = 'record_' + normalizeKey(rest.substring(0, lastU)) + '_' + rest.substring(lastU + 1);
+                    const prev = parseFloat(localStorage.getItem(nk));
+                    const curr = parseFloat(v);
+                    if (!prev || curr > prev) localStorage.setItem(nk, v);
+                  }
+                }
+              });
+
+              // メモを再反映
+              document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalized) || '';
+              document.getElementById('driveStatus').textContent = '✅ データ取得完了';
+              setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 3000);
+            } catch(err) {
+              console.error('Client load error:', err);
+              document.getElementById('driveStatus').textContent = '❌ 読み込み失敗';
+            }
+          }, 1000);
+        }
       });
 
       addExercise();
