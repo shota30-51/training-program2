@@ -239,6 +239,14 @@
     // =====================================================
     const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqly2OdgCmXrex1XS5ThTPgRIRQaVGNlSQAe3XXXTnQAh-lahSAvHxANMxfny380Dzcg/exec';
 
+    // =====================================================
+    // 🔧 名前正規化（スペース除去で統一キーを生成）
+    // 「野田 智幸」「野田智幸」→ 両方「野田智幸」に統一
+    // =====================================================
+    function normalizeKey(name) {
+      return name.replace(/[\s\u3000]+/g, '');
+    }
+
     let memoSaveTimer = null;
 
     // =====================================================
@@ -366,7 +374,7 @@
       clearTimeout(memoSaveTimer);
       document.getElementById('driveStatus').textContent = '...自動保存準備中';
       memoSaveTimer = setTimeout(async () => {
-        await postToServer({ action: 'saveMemo', clientName, memo });
+        await postToServer({ action: 'saveMemo', clientName: normalizeKey(clientName), memo });
       }, 2000);
     }
 
@@ -403,30 +411,39 @@
 
       document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
 
-      // メモをスプシに保存
+      // メモをスプシに保存（正規化キーで統一）
       if (memo) {
-        await postToServer({ action: 'saveMemo', clientName, memo });
+        await postToServer({ action: 'saveMemo', clientName: normalizeKey(clientName), memo });
       }
       // 種目データをスプシに保存
       if (exercisesData.length > 0) {
-        await postToServer({ action: 'saveTraining', date, clientName, exercises: exercisesData });
+        await postToServer({ action: 'saveTraining', date, clientName: normalizeKey(clientName), exercises: exercisesData });
       }
 
       document.getElementById('driveStatus').textContent = '✅ 保存成功';
       setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
     }
 
-    // ✅ 種目の最高重量をlocalStorageに記録
+    // ✅ 種目の最高重量をlocalStorageに記録 + スプレッドシートにも同期
     function updateMaxWeights(clientName, exercisesData) {
+      const normalized = normalizeKey(clientName);
+      const weightsToSync = [];
       exercisesData.forEach(function(ex) {
         const weights = (ex.sets || []).map(function(s) { return parseFloat(s.weight); }).filter(function(w) { return !isNaN(w); });
-        if (weights.length > 0 && clientName && ex.name) {
+        if (weights.length > 0 && normalized && ex.name) {
           const maxWeight = Math.max.apply(null, weights);
-          const key  = 'record_' + clientName + '_' + ex.name;
+          const key  = 'record_' + normalized + '_' + ex.name;
           const prev = parseFloat(localStorage.getItem(key));
-          if (!prev || maxWeight > prev) localStorage.setItem(key, maxWeight);
+          if (!prev || maxWeight > prev) {
+            localStorage.setItem(key, maxWeight);
+            weightsToSync.push({ exercise: ex.name, weight: maxWeight });
+          }
         }
       });
+      // サーバーにも最高重量を同期
+      if (weightsToSync.length > 0) {
+        postToServer({ action: 'saveWeights', clientName: normalized, weights: weightsToSync });
+      }
     }
 
     // ✅ 共通送信関数（GET + no-cors でURLパラメータ送信）
@@ -443,7 +460,7 @@
       }
     }
 
-    // ✅ スプレッドシートからデータ読み込み
+    // ✅ スプレッドシートからデータ読み込み（キーを正規化して保存）
     async function loadFromServer() {
       document.getElementById('driveStatus').textContent = '📂 読み込み中...';
       try {
@@ -451,18 +468,47 @@
         const data = await res.json();
 
         let count = 0;
-        Object.entries(data.memos   || {}).forEach(([k, v]) => { localStorage.setItem(k, v); count++; });
-        Object.entries(data.weights || {}).forEach(([k, v]) => { localStorage.setItem(k, v); count++; });
+        // メモ: "memo_野田 智幸" → "memo_野田智幸" に正規化して保存
+        Object.entries(data.memos || {}).forEach(([k, v]) => {
+          const prefix = 'memo_';
+          if (k.startsWith(prefix)) {
+            const normalizedKey = prefix + normalizeKey(k.substring(prefix.length));
+            localStorage.setItem(normalizedKey, v);
+          } else {
+            localStorage.setItem(k, v);
+          }
+          count++;
+        });
+        // 重量: "record_野田 智幸_ベンチプレス" → "record_野田智幸_ベンチプレス" に正規化
+        Object.entries(data.weights || {}).forEach(([k, v]) => {
+          const prefix = 'record_';
+          if (k.startsWith(prefix)) {
+            // "record_名前_種目" → 名前部分だけ正規化
+            const rest = k.substring(prefix.length);
+            const lastUnderscore = rest.lastIndexOf('_');
+            if (lastUnderscore > 0) {
+              const clientPart = rest.substring(0, lastUnderscore);
+              const exercisePart = rest.substring(lastUnderscore + 1);
+              const normalizedKey = prefix + normalizeKey(clientPart) + '_' + exercisePart;
+              localStorage.setItem(normalizedKey, v);
+            } else {
+              localStorage.setItem(k, v);
+            }
+          } else {
+            localStorage.setItem(k, v);
+          }
+          count++;
+        });
 
         const now = new Date().toLocaleTimeString('ja-JP');
         document.getElementById('driveStatus').textContent = `✅ ${count}件読み込み完了 ${now}`;
         setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
 
-        // クライアント名が入力済みならメモを即反映
+        // クライアント名が入力済みならメモを即反映（正規化キーで取得）
         const clientName = document.getElementById('clientName').value.trim();
         if (clientName) {
           document.getElementById('trainerMemo').value =
-            localStorage.getItem('memo_' + clientName) || '';
+            localStorage.getItem('memo_' + normalizeKey(clientName)) || '';
         }
       } catch(err) {
         console.error('Load error:', err);
@@ -559,7 +605,7 @@
         const clientName = document.getElementById('clientName').value.trim();
         const selectedExercise = exerciseSelect.value;
         if (!clientName || !selectedExercise) return;
-        const key = `record_${clientName}_${selectedExercise}`;
+        const key = `record_${normalizeKey(clientName)}_${selectedExercise}`;
         const maxWeight = localStorage.getItem(key);
         maxWeightDisplay.textContent = maxWeight
           ? `過去最高重量：${maxWeight} kg`
@@ -640,19 +686,19 @@
         window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
       });
 
-      // メモ入力 → 2秒後に自動保存
+      // メモ入力 → 2秒後に自動保存（正規化キー使用）
       document.getElementById('trainerMemo').addEventListener('input', function() {
         const name = document.getElementById('clientName').value.trim();
         if (name) {
           const memo = document.getElementById('trainerMemo').value;
-          localStorage.setItem('memo_' + name, memo);
+          localStorage.setItem('memo_' + normalizeKey(name), memo);
           scheduleMemoSave(name, memo);
         }
       });
 
       document.getElementById('clientName').addEventListener('input', function() {
-        const name = document.getElementById('clientName').value;
-        document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + name) || '';
+        const name = document.getElementById('clientName').value.trim();
+        document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalizeKey(name)) || '';
       });
 
       addExercise();
