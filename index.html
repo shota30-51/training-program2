@@ -816,6 +816,32 @@
 
       // ページ読み込み時にスプシから自動取得
       loadFromServer();
+
+      // 🔄 localStorageの既存重量データをスプシに一括アップロード（初回のみ）
+      if (!localStorage.getItem('__weightsSynced')) {
+        const allWeights = {};
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key.startsWith('record_')) {
+            const rest = key.substring(7);
+            const lastU = rest.lastIndexOf('_');
+            if (lastU > 0) {
+              const clientName = rest.substring(0, lastU);
+              const exercise = rest.substring(lastU + 1);
+              const weight = parseFloat(localStorage.getItem(key));
+              if (!isNaN(weight)) {
+                if (!allWeights[clientName]) allWeights[clientName] = [];
+                allWeights[clientName].push({ exercise, weight });
+              }
+            }
+          }
+        }
+        // クライアントごとにサーバーへ送信
+        Object.entries(allWeights).forEach(([client, weights]) => {
+          postToServer({ action: 'saveWeights', clientName: client, weights });
+        });
+        localStorage.setItem('__weightsSynced', '1');
+      }
     }
   </script>
 </body>
