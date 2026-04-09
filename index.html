@@ -250,6 +250,56 @@
     let memoSaveTimer = null;
 
     // =====================================================
+    // 🔄 localStorage既存データの移行（旧スペース有キー → 正規化キー）
+    // 初回のみ実行し、完了後はフラグを立てて再実行しない
+    // =====================================================
+    if (!localStorage.getItem('__keysMigrated')) {
+      const keysToMigrate = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        keysToMigrate.push(localStorage.key(i));
+      }
+      keysToMigrate.forEach(function(key) {
+        // record_名前_種目 のキーを正規化
+        if (key.startsWith('record_')) {
+          const rest = key.substring(7); // "record_" の後
+          const lastUnderscore = rest.lastIndexOf('_');
+          if (lastUnderscore > 0) {
+            const clientPart = rest.substring(0, lastUnderscore);
+            const exercisePart = rest.substring(lastUnderscore + 1);
+            const normalizedClient = normalizeKey(clientPart);
+            const newKey = 'record_' + normalizedClient + '_' + exercisePart;
+            if (newKey !== key) {
+              // 新キーに既に値がある場合は大きい方を採用
+              const oldVal = parseFloat(localStorage.getItem(key));
+              const newVal = parseFloat(localStorage.getItem(newKey));
+              if (!newVal || oldVal > newVal) {
+                localStorage.setItem(newKey, localStorage.getItem(key));
+              }
+              localStorage.removeItem(key);
+            }
+          }
+        }
+        // memo_名前 のキーを正規化
+        if (key.startsWith('memo_')) {
+          const clientPart = key.substring(5); // "memo_" の後
+          const normalizedClient = normalizeKey(clientPart);
+          const newKey = 'memo_' + normalizedClient;
+          if (newKey !== key) {
+            const oldVal = localStorage.getItem(key) || '';
+            const newVal = localStorage.getItem(newKey) || '';
+            if (newVal && oldVal && newVal !== oldVal) {
+              localStorage.setItem(newKey, newVal + '\n' + oldVal);
+            } else if (oldVal) {
+              localStorage.setItem(newKey, oldVal);
+            }
+            localStorage.removeItem(key);
+          }
+        }
+      });
+      localStorage.setItem('__keysMigrated', '1');
+    }
+
+    // =====================================================
     // PDF表示モード判定（?mode=pdf で別タブから起動）
     // Blob URL・document.write()を使わない iOS 対応方式
     // =====================================================
