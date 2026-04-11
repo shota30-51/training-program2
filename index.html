@@ -490,9 +490,13 @@
           }
         }
       });
-      // サーバーにも最高重量を同期
+      // サーバーにも最高重量を同期（POST方式で確実に送信）
       if (weightsToSync.length > 0) {
-        postToServer({ action: 'saveWeights', clientName: normalized, weights: weightsToSync });
+        fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify({ action: 'saveWeights', clientName: normalized, weights: weightsToSync })
+        }).catch(err => console.error('Weight save error:', err));
       }
     }
 
@@ -818,7 +822,8 @@
       loadFromServer();
 
       // 🔄 localStorageの既存重量データをスプシに一括アップロード（初回のみ）
-      if (!localStorage.getItem('__weightsSynced')) {
+      // POST方式で送信（GETだとURLが長すぎて失敗するため）
+      if (!localStorage.getItem('__weightsSynced2')) {
         const allWeights = {};
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
@@ -836,11 +841,26 @@
             }
           }
         }
-        // クライアントごとにサーバーへ送信
-        Object.entries(allWeights).forEach(([client, weights]) => {
-          postToServer({ action: 'saveWeights', clientName: client, weights });
-        });
-        localStorage.setItem('__weightsSynced', '1');
+        // クライアントごとにPOSTで送信
+        const clients = Object.entries(allWeights);
+        if (clients.length > 0) {
+          document.getElementById('driveStatus').textContent = '📤 重量データ同期中...';
+          let sent = 0;
+          clients.forEach(([client, weights]) => {
+            fetch(SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              body: JSON.stringify({ action: 'saveWeights', clientName: client, weights })
+            }).then(() => {
+              sent++;
+              if (sent >= clients.length) {
+                document.getElementById('driveStatus').textContent = '✅ 重量データ同期完了';
+                setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+              }
+            }).catch(err => console.error('Weight sync error:', err));
+          });
+        }
+        localStorage.setItem('__weightsSynced2', '1');
       }
     }
   </script>
