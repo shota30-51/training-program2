@@ -214,7 +214,7 @@
     </div>
     <div id="exercises"></div>
     <div class="button-area">
-      <button onclick="addExercise()">種目を追加</button>
+      <button onclick="addExercise(); autoSaveForm();">種目を追加</button>
       <button id="viewModeBtn">表示モード（別タブ）</button>
     </div>
 
@@ -729,8 +729,108 @@
       setsContainer.appendChild(newSet);
     }
 
-    function removeExercise(button) { button.closest('.exercise').remove(); }
-    function removeSet(button)      { button.closest('.set-group').remove(); }
+    function removeExercise(button) { button.closest('.exercise').remove(); autoSaveForm(); }
+    function removeSet(button)      { button.closest('.set-group').remove(); autoSaveForm(); }
+
+    // =====================================================
+    // 🔄 フォーム自動保存・復元（リロードしてもデータを保持）
+    // =====================================================
+    let autoSaveTimer = null;
+    function autoSaveForm() {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = setTimeout(function() {
+        const formData = {
+          clientName: document.getElementById('clientName').value,
+          date: document.getElementById('trainingDate').value,
+          memo: document.getElementById('trainerMemo').value,
+          exercises: []
+        };
+        document.querySelectorAll('.exercise').forEach(function(ex) {
+          const part = ex.querySelector('.body-part').value;
+          const partOther = ex.querySelector('.body-part-other') ? ex.querySelector('.body-part-other').value : '';
+          const exerciseName = ex.querySelector('.exercise-name').value;
+          const exerciseOther = ex.querySelector('.exercise-name-other') ? ex.querySelector('.exercise-name-other').value : '';
+          const remarks = ex.querySelector('textarea[placeholder="備考"]').value;
+          const sets = [];
+          ex.querySelectorAll('.set-group').forEach(function(s) {
+            sets.push({
+              weight: s.querySelector('input[placeholder="重量(kg)"]').value,
+              reps: s.querySelector('input[placeholder="回数"]').value
+            });
+          });
+          formData.exercises.push({ part, partOther, exerciseName, exerciseOther, remarks, sets });
+        });
+        localStorage.setItem('__formData', JSON.stringify(formData));
+      }, 500);
+    }
+
+    function restoreForm() {
+      const raw = localStorage.getItem('__formData');
+      if (!raw) return false;
+      try {
+        const formData = JSON.parse(raw);
+        document.getElementById('clientName').value = formData.clientName || '';
+        document.getElementById('trainingDate').value = formData.date || '';
+        document.getElementById('trainerMemo').value = formData.memo || '';
+
+        const exercises = formData.exercises || [];
+        if (exercises.length === 0) return false;
+
+        exercises.forEach(function(exData) {
+          addExercise();
+          const exElements = document.querySelectorAll('.exercise');
+          const ex = exElements[exElements.length - 1];
+
+          // 部位を設定
+          const bodyPartSelect = ex.querySelector('.body-part');
+          if (exData.part) {
+            bodyPartSelect.value = exData.part;
+            bodyPartSelect.dispatchEvent(new Event('change'));
+          }
+          // その他の場合
+          if (exData.part === 'その他') {
+            const bpInput = ex.querySelector('.body-part-other');
+            if (bpInput) bpInput.value = exData.partOther || '';
+            const exInput = ex.querySelector('.exercise-name-other');
+            if (exInput) exInput.value = exData.exerciseOther || '';
+          } else if (exData.exerciseName) {
+            // 種目を設定
+            const exerciseSelect = ex.querySelector('.exercise-name');
+            exerciseSelect.value = exData.exerciseName;
+            exerciseSelect.dispatchEvent(new Event('change'));
+          }
+
+          // 備考
+          const remarksEl = ex.querySelector('textarea[placeholder="備考"]');
+          if (remarksEl) remarksEl.value = exData.remarks || '';
+
+          // セット（最初の1セットは既にあるので、2セット目以降を追加）
+          const setsDiv = ex.querySelector('.sets');
+          const addSetBtn = ex.querySelector('button');
+          (exData.sets || []).forEach(function(setData, idx) {
+            if (idx > 0) {
+              // セットを追加
+              const newSet = document.createElement('div');
+              newSet.className = 'set-group';
+              newSet.innerHTML = '<input type="number" step="0.1" placeholder="重量(kg)">' +
+                '<input type="number" step="1" placeholder="回数">' +
+                '<button class="remove-btn" onclick="removeSet(this)">セット削除</button>';
+              setsDiv.appendChild(newSet);
+            }
+            const setGroups = setsDiv.querySelectorAll('.set-group');
+            const sg = setGroups[idx];
+            if (sg) {
+              sg.querySelector('input[placeholder="重量(kg)"]').value = setData.weight || '';
+              sg.querySelector('input[placeholder="回数"]').value = setData.reps || '';
+            }
+          });
+        });
+        return true;
+      } catch(e) {
+        console.error('Form restore error:', e);
+        return false;
+      }
+    }
 
     // ✅ 通常モードのみ初期化（PDF表示モードでは不要）
     if (!PDF_MODE) {
@@ -816,7 +916,15 @@
         }
       });
 
-      addExercise();
+      // フォーム復元（保存データがあれば復元、なければ空の種目を1つ追加）
+      if (!restoreForm()) {
+        addExercise();
+      }
+
+      // 入力変更時に自動保存（イベント委任）
+      document.getElementById('mainContainer').addEventListener('input', autoSaveForm);
+      document.getElementById('mainContainer').addEventListener('change', autoSaveForm);
+      document.getElementById('trainerMemo').addEventListener('input', autoSaveForm);
 
       // ページ読み込み時にスプシから自動取得
       loadFromServer();
