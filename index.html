@@ -474,7 +474,7 @@
       setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
 
       // 保存完了後、フォームデータをクリア（次回は新しい状態で開始）
-      localStorage.removeItem('__formData');
+      sessionStorage.removeItem('__formData');
     }
 
     // ✅ 種目の最高重量をlocalStorageに記録 + スプレッドシートにも同期
@@ -763,12 +763,12 @@
           });
           formData.exercises.push({ part, partOther, exerciseName, exerciseOther, remarks, sets });
         });
-        localStorage.setItem('__formData', JSON.stringify(formData));
+        sessionStorage.setItem('__formData', JSON.stringify(formData));
       }, 500);
     }
 
     function restoreForm() {
-      const raw = localStorage.getItem('__formData');
+      const raw = sessionStorage.getItem('__formData');
       if (!raw) return false;
       try {
         const formData = JSON.parse(raw);
