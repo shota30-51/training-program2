@@ -472,6 +472,9 @@
 
       document.getElementById('driveStatus').textContent = '✅ 保存成功';
       setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+
+      // 保存完了後、フォームデータをクリア（次回は新しい状態で開始）
+      localStorage.removeItem('__formData');
     }
 
     // ✅ 種目の最高重量をlocalStorageに記録 + スプレッドシートにも同期
