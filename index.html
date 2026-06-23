@@ -317,12 +317,10 @@
       exercisesData.forEach(function(ex) {
         body += '<div style="border:1px solid #bbb;padding:8px 10px;border-radius:6px;margin-bottom:8px;background:#f9f9f9;' + f + '">';
         body += '<p style="font-weight:bold;margin:0 0 4px 0;font-size:13px;">' + ex.part + '：' + ex.name + '</p>';
-        // セットを横並びで表示してスペースを節約
-        var setsLine = (ex.sets || []).map(function(s, i) {
+        (ex.sets || []).forEach(function(s, i) {
           var w = parseFloat(s.weight);
-          return 'セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg×' + (s.reps || '-') + '回';
-        }).join('　');
-        body += '<p style="margin:0 0 0 10px;font-size:12px;color:#333;">' + setsLine + '</p>';
+          body += '<p style="margin:2px 0 2px 10px;font-size:12px;">セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg × ' + (s.reps || '-') + '回</p>';
+        });
         if (ex.remarks) {
           body += '<p style="color:#c62828;font-size:11px;margin:4px 0 0 0;white-space:pre-wrap;">備考：' + ex.remarks + '</p>';
         }
