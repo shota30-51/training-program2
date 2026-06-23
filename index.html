@@ -307,23 +307,24 @@
 
     // === 表示用HTML生成（データオブジェクトから構築） ===
     function buildDisplayBody(clientName, date, exercisesData) {
-      var f = 'font-family:Helvetica,Arial,sans-serif;';
+      var f = 'font-family:Helvetica,Arial,sans-serif;box-sizing:border-box;';
       var body = '';
-      body += '<h1 style="text-align:center;background:#1a237e;color:white;padding:20px;border-radius:8px;font-size:22px;margin:0 0 20px 0;' + f + '">トレーニングプログラム記録</h1>';
-      // display:flex は html2canvas が苦手なため table に変更
-      body += '<table style="width:100%;margin-bottom:20px;font-size:16px;' + f + '">';
+      body += '<h1 style="text-align:center;background:#1a237e;color:white;padding:10px;border-radius:6px;font-size:18px;margin:0 0 12px 0;' + f + '">トレーニングプログラム記録</h1>';
+      body += '<table style="width:100%;margin-bottom:12px;font-size:13px;' + f + '">';
       body += '<tr><td>クライアント名：' + (clientName ? clientName + ' 様' : '') + '</td>';
       body += '<td style="text-align:right;">日付：' + (date || '') + '</td></tr>';
       body += '</table>';
       exercisesData.forEach(function(ex) {
-        body += '<div style="border:1px solid #999;padding:16px;border-radius:10px;margin-bottom:16px;background:#f9f9f9;' + f + '">';
-        body += '<p style="font-weight:bold;margin:0 0 8px 0;font-size:16px;">' + ex.part + '：' + ex.name + '</p>';
-        (ex.sets || []).forEach(function(s, i) {
+        body += '<div style="border:1px solid #bbb;padding:8px 10px;border-radius:6px;margin-bottom:8px;background:#f9f9f9;' + f + '">';
+        body += '<p style="font-weight:bold;margin:0 0 4px 0;font-size:13px;">' + ex.part + '：' + ex.name + '</p>';
+        // セットを横並びで表示してスペースを節約
+        var setsLine = (ex.sets || []).map(function(s, i) {
           var w = parseFloat(s.weight);
-          body += '<p style="margin:4px 0 4px 20px;font-size:15px;">セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg × ' + (s.reps || '-') + '回</p>';
-        });
+          return 'セット' + (i + 1) + '：' + (isNaN(w) ? '-' : w) + 'kg×' + (s.reps || '-') + '回';
+        }).join('　');
+        body += '<p style="margin:0 0 0 10px;font-size:12px;color:#333;">' + setsLine + '</p>';
         if (ex.remarks) {
-          body += '<p style="color:#c62828;font-size:14px;margin:8px 0 0 0;white-space:pre-wrap;">備考：' + ex.remarks + '</p>';
+          body += '<p style="color:#c62828;font-size:11px;margin:4px 0 0 0;white-space:pre-wrap;">備考：' + ex.remarks + '</p>';
         }
         body += '</div>';
       });
