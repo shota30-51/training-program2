@@ -341,7 +341,7 @@
         document.body.style.cssText = 'margin:0;padding:0;background:white;font-family:Segoe UI,Helvetica Neue,sans-serif;';
         document.body.innerHTML =
           '<div id="pdfStatus" style="position:fixed;top:20px;right:20px;background:#fff8e1;border:2px solid #ffc107;padding:15px 20px;border-radius:8px;font-weight:bold;color:#e65100;z-index:9999;">📄 PDF生成中... しばらくお待ちください</div>'
-          + '<div id="pdfContent" style="padding:40px;">' + pdfData.displayBody + '</div>';
+          + '<div id="pdfContent" style="padding:20px 30px;max-width:750px;margin:0 auto;box-sizing:border-box;">' + pdfData.displayBody + '</div>';
 
         const st = document.getElementById('pdfStatus');
 
@@ -362,7 +362,7 @@
 
             const el = document.getElementById('pdfContent');
             const blob = await html2pdf().set({
-              margin: 10,
+              margin: [10, 15, 10, 15],
               image: { type: 'jpeg', quality: 0.95 },
               html2canvas: {
                 scale: 2,
@@ -370,7 +370,7 @@
                 backgroundColor: '#ffffff',
                 scrollX: 0,
                 scrollY: 0,
-                windowWidth: 800,
+                windowWidth: 794,
                 logging: false
               },
               jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
@@ -517,53 +517,38 @@
       }
     }
 
-    // ✅ スプレッドシートからデータ読み込み（キーを正規化して保存）
+    // ✅ スプレッドシートからデータ読み込み（上書き方式・重複防止）
+    let serverDataCache = null; // キャッシュで二重読み込みを防止
+
     async function loadFromServer() {
       document.getElementById('driveStatus').textContent = '📂 読み込み中...';
       try {
         const res  = await fetch(SCRIPT_URL);
         const data = await res.json();
+        serverDataCache = data;
 
         let count = 0;
-        // メモ: "memo_野田 智幸" → "memo_野田智幸" に正規化して保存
-        // 同一正規化キーが複数ある場合は改行で結合（データ消失防止）
-        const memoMerged = {};
+        // メモ: 正規化キーで上書き（マージしない → 重複防止）
+        // スプシ側の値が正：読み込んだ値でlocalStorageを上書きする
         Object.entries(data.memos || {}).forEach(([k, v]) => {
-          const prefix = 'memo_';
-          if (k.startsWith(prefix)) {
-            const normalizedKey = prefix + normalizeKey(k.substring(prefix.length));
-            if (memoMerged[normalizedKey] && v && memoMerged[normalizedKey] !== v) {
-              memoMerged[normalizedKey] = memoMerged[normalizedKey] + '\n' + v;
-            } else if (v) {
-              memoMerged[normalizedKey] = v;
-            }
-          } else {
-            memoMerged[k] = v;
+          if (k.startsWith('memo_')) {
+            const normalizedKey = 'memo_' + normalizeKey(k.substring(5));
+            if (v) localStorage.setItem(normalizedKey, v);
           }
           count++;
         });
-        Object.entries(memoMerged).forEach(([k, v]) => { localStorage.setItem(k, v); });
-        // 重量: "record_野田 智幸_ベンチプレス" → "record_野田智幸_ベンチプレス" に正規化
-        // 同一正規化キーが複数ある場合は大きい方を採用
+
+        // 重量: 正規化キーで最大値を採用
         Object.entries(data.weights || {}).forEach(([k, v]) => {
-          const prefix = 'record_';
-          if (k.startsWith(prefix)) {
-            const rest = k.substring(prefix.length);
-            const lastUnderscore = rest.lastIndexOf('_');
-            if (lastUnderscore > 0) {
-              const clientPart = rest.substring(0, lastUnderscore);
-              const exercisePart = rest.substring(lastUnderscore + 1);
-              const normalizedKey = prefix + normalizeKey(clientPart) + '_' + exercisePart;
+          if (k.startsWith('record_')) {
+            const rest = k.substring(7);
+            const lastU = rest.lastIndexOf('_');
+            if (lastU > 0) {
+              const normalizedKey = 'record_' + normalizeKey(rest.substring(0, lastU)) + '_' + rest.substring(lastU + 1);
               const prev = parseFloat(localStorage.getItem(normalizedKey));
               const curr = parseFloat(v);
-              if (!prev || curr > prev) {
-                localStorage.setItem(normalizedKey, v);
-              }
-            } else {
-              localStorage.setItem(k, v);
+              if (!prev || curr > prev) localStorage.setItem(normalizedKey, v);
             }
-          } else {
-            localStorage.setItem(k, v);
           }
           count++;
         });
@@ -572,7 +557,7 @@
         document.getElementById('driveStatus').textContent = `✅ ${count}件読み込み完了 ${now}`;
         setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
 
-        // クライアント名が入力済みならメモを即反映（正規化キーで取得）
+        // クライアント名が入力済みならメモを即反映
         const clientName = document.getElementById('clientName').value.trim();
         if (clientName) {
           document.getElementById('trainerMemo').value =
@@ -864,58 +849,25 @@
         }
       });
 
-      // クライアント名入力 → 1秒後にスプシから該当データを再取得
-      let clientLoadTimer = null;
+      // クライアント名入力 → キャッシュからメモを反映（二重fetch防止）
       document.getElementById('clientName').addEventListener('input', function() {
         const name = document.getElementById('clientName').value.trim();
-        // まずlocalStorageからメモを即反映
-        document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalizeKey(name)) || '';
-        // 1秒後にスプシから最新データを取得（デバウンス）
-        clearTimeout(clientLoadTimer);
-        if (name) {
-          clientLoadTimer = setTimeout(async function() {
-            document.getElementById('driveStatus').textContent = '📂 データ読み込み中...';
-            try {
-              const res = await fetch(SCRIPT_URL);
-              const data = await res.json();
-              const normalized = normalizeKey(name);
+        const normalized = normalizeKey(name);
 
-              // メモを更新（正規化キーでマージ）
-              Object.entries(data.memos || {}).forEach(([k, v]) => {
-                if (k.startsWith('memo_')) {
-                  const nk = 'memo_' + normalizeKey(k.substring(5));
-                  const existing = localStorage.getItem(nk);
-                  if (existing && v && existing !== v && !existing.includes(v)) {
-                    localStorage.setItem(nk, existing + '\n' + v);
-                  } else if (v) {
-                    localStorage.setItem(nk, v);
-                  }
-                }
-              });
-
-              // 重量を更新（正規化キーで最大値）
-              Object.entries(data.weights || {}).forEach(([k, v]) => {
-                if (k.startsWith('record_')) {
-                  const rest = k.substring(7);
-                  const lastU = rest.lastIndexOf('_');
-                  if (lastU > 0) {
-                    const nk = 'record_' + normalizeKey(rest.substring(0, lastU)) + '_' + rest.substring(lastU + 1);
-                    const prev = parseFloat(localStorage.getItem(nk));
-                    const curr = parseFloat(v);
-                    if (!prev || curr > prev) localStorage.setItem(nk, v);
-                  }
-                }
-              });
-
-              // メモを再反映
-              document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalized) || '';
-              document.getElementById('driveStatus').textContent = '✅ データ取得完了';
-              setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 3000);
-            } catch(err) {
-              console.error('Client load error:', err);
-              document.getElementById('driveStatus').textContent = '❌ 読み込み失敗';
+        // キャッシュがあればそこから反映、なければlocalStorage
+        if (serverDataCache) {
+          const memos = serverDataCache.memos || {};
+          // 正規化キーでスプシのメモを検索
+          let memoVal = '';
+          Object.entries(memos).forEach(([k, v]) => {
+            if (k.startsWith('memo_') && normalizeKey(k.substring(5)) === normalized) {
+              memoVal = v;
             }
-          }, 1000);
+          });
+          document.getElementById('trainerMemo').value = memoVal || localStorage.getItem('memo_' + normalized) || '';
+          if (memoVal) localStorage.setItem('memo_' + normalized, memoVal);
+        } else {
+          document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalized) || '';
         }
       });
 
