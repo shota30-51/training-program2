@@ -315,7 +315,7 @@
       body += '<td style="text-align:right;">日付：' + (date || '') + '</td></tr>';
       body += '</table>';
       exercisesData.forEach(function(ex) {
-        body += '<div style="border:1px solid #bbb;padding:8px 10px;border-radius:6px;margin-bottom:8px;background:#f9f9f9;' + f + '">';
+        body += '<div style="border:1px solid #bbb;padding:8px 10px;border-radius:6px;margin-bottom:8px;background:#f9f9f9;page-break-inside:avoid;break-inside:avoid;' + f + '">';
         body += '<p style="font-weight:bold;margin:0 0 4px 0;font-size:13px;">' + ex.part + '：' + ex.name + '</p>';
         (ex.sets || []).forEach(function(s, i) {
           var w = parseFloat(s.weight);
@@ -372,7 +372,8 @@
                 windowWidth: 794,
                 logging: false
               },
-              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+              pagebreak: { mode: ['css', 'legacy'], avoid: ['div'] }
             }).from(el).outputPdf('blob');
 
             st.style.display = 'block';
