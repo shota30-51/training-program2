@@ -202,6 +202,203 @@
       font-weight: bold;
       margin-top: 5px;
     }
+
+    /* =====================================================
+       📸 スクリーンショット用ビュー
+    ===================================================== */
+    #screenshotView {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #f0f4f8;
+      z-index: 3000;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .ss-header {
+      background: linear-gradient(135deg, #1a237e, #0d47a1);
+      color: white;
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    .ss-header-title {
+      font-size: 16px;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+    }
+
+    .ss-back-btn {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      color: white;
+      padding: 7px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      margin: 0;
+    }
+
+    .ss-back-btn:hover {
+      background: rgba(255,255,255,0.35);
+    }
+
+    /* ===== スクリーンショット対象エリア ===== */
+    #ssCapture {
+      max-width: 540px;
+      margin: 16px auto;
+      padding: 0 12px 80px 12px;
+    }
+
+    .ss-card-header {
+      background: linear-gradient(135deg, #1a237e, #0d47a1);
+      color: white;
+      border-radius: 12px 12px 0 0;
+      padding: 16px 20px;
+      text-align: center;
+    }
+
+    .ss-card-header h2 {
+      margin: 0 0 8px 0;
+      font-size: 17px;
+      letter-spacing: 1px;
+    }
+
+    .ss-client-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      opacity: 0.9;
+    }
+
+    .ss-client-name {
+      font-size: 16px;
+      font-weight: bold;
+    }
+
+    .ss-date {
+      font-size: 13px;
+      opacity: 0.85;
+    }
+
+    /* 種目カード */
+    .ss-exercise-card {
+      background: white;
+      border-left: 4px solid #0d47a1;
+      border-radius: 0;
+      padding: 12px 14px;
+      margin: 2px 0;
+    }
+
+    .ss-exercise-card:last-of-type {
+      border-radius: 0 0 12px 12px;
+      margin-bottom: 0;
+    }
+
+    .ss-exercise-name {
+      font-size: 14px;
+      font-weight: bold;
+      color: #1a237e;
+      margin: 0 0 8px 0;
+    }
+
+    .ss-part-badge {
+      display: inline-block;
+      background: #e8eaf6;
+      color: #3949ab;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-right: 6px;
+      font-weight: normal;
+    }
+
+    .ss-sets-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .ss-set-item {
+      background: #f5f7fa;
+      border: 1px solid #e0e4ef;
+      border-radius: 6px;
+      padding: 5px 8px;
+      text-align: center;
+      font-size: 12px;
+    }
+
+    .ss-set-label {
+      color: #888;
+      font-size: 10px;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    .ss-set-value {
+      font-weight: bold;
+      color: #1a237e;
+      font-size: 13px;
+    }
+
+    .ss-remarks {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #c62828;
+      background: #fff8f8;
+      border-left: 3px solid #f44336;
+      padding: 5px 8px;
+      border-radius: 0 4px 4px 0;
+      white-space: pre-wrap;
+    }
+
+    /* フッター */
+    .ss-footer {
+      text-align: center;
+      font-size: 11px;
+      color: #888;
+      padding: 12px;
+      margin-top: 4px;
+    }
+
+    /* 下部固定ボタンエリア */
+    .ss-bottom-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      border-top: 1px solid #ddd;
+      padding: 10px 16px;
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      z-index: 10;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+    }
+
+    .ss-pdf-btn {
+      background: #4a148c;
+      font-size: 14px;
+      padding: 11px 22px;
+      border-radius: 8px;
+      margin: 0;
+    }
+
+    .ss-close-btn {
+      background: #546e7a;
+      font-size: 14px;
+      padding: 11px 22px;
+      border-radius: 8px;
+      margin: 0;
+    }
   </style>
 </head>
 <body>
@@ -233,6 +430,26 @@
     <textarea id="trainerMemo" placeholder="次回に引き継ぐメモを入力してください"></textarea>
   </div>
 
+  <!-- =====================================================
+       📸 スクリーンショット用ビュー（保存後に表示）
+  ===================================================== -->
+  <div id="screenshotView">
+    <div class="ss-header">
+      <button class="ss-back-btn" onclick="closeScreenshotView()">← 戻る</button>
+      <span class="ss-header-title">📸 スクリーンショット用</span>
+      <div style="width:70px;"></div>
+    </div>
+
+    <div id="ssCapture">
+      <!-- JS で動的に生成 -->
+    </div>
+
+    <div class="ss-bottom-bar">
+      <button class="ss-pdf-btn" onclick="openPdfTab()">📄 PDF保存</button>
+      <button class="ss-close-btn" onclick="closeScreenshotView()">✕ 閉じる</button>
+    </div>
+  </div>
+
   <script>
     // =====================================================
     // ⚙️ Apps Script URL（デプロイ済み）
@@ -241,17 +458,15 @@
 
     // =====================================================
     // 🔧 名前正規化（スペース除去で統一キーを生成）
-    // 「野田 智幸」「野田智幸」→ 両方「野田智幸」に統一
     // =====================================================
     function normalizeKey(name) {
-      return name.replace(/[\s\u3000]+/g, '');
+      return name.replace(/[\s　]+/g, '');
     }
 
     let memoSaveTimer = null;
 
     // =====================================================
     // 🔄 localStorage既存データの移行（旧スペース有キー → 正規化キー）
-    // 初回のみ実行し、完了後はフラグを立てて再実行しない
     // =====================================================
     if (!localStorage.getItem('__keysMigrated')) {
       const keysToMigrate = [];
@@ -259,9 +474,8 @@
         keysToMigrate.push(localStorage.key(i));
       }
       keysToMigrate.forEach(function(key) {
-        // record_名前_種目 のキーを正規化
         if (key.startsWith('record_')) {
-          const rest = key.substring(7); // "record_" の後
+          const rest = key.substring(7);
           const lastUnderscore = rest.lastIndexOf('_');
           if (lastUnderscore > 0) {
             const clientPart = rest.substring(0, lastUnderscore);
@@ -269,7 +483,6 @@
             const normalizedClient = normalizeKey(clientPart);
             const newKey = 'record_' + normalizedClient + '_' + exercisePart;
             if (newKey !== key) {
-              // 新キーに既に値がある場合は大きい方を採用
               const oldVal = parseFloat(localStorage.getItem(key));
               const newVal = parseFloat(localStorage.getItem(newKey));
               if (!newVal || oldVal > newVal) {
@@ -279,9 +492,8 @@
             }
           }
         }
-        // memo_名前 のキーを正規化
         if (key.startsWith('memo_')) {
-          const clientPart = key.substring(5); // "memo_" の後
+          const clientPart = key.substring(5);
           const normalizedClient = normalizeKey(clientPart);
           const newKey = 'memo_' + normalizedClient;
           if (newKey !== key) {
@@ -301,11 +513,10 @@
 
     // =====================================================
     // PDF表示モード判定（?mode=pdf で別タブから起動）
-    // Blob URL・document.write()を使わない iOS 対応方式
     // =====================================================
     const PDF_MODE = new URLSearchParams(location.search).get('mode') === 'pdf';
 
-    // === 表示用HTML生成（データオブジェクトから構築） ===
+    // === 表示用HTML生成（PDF・スクリーンショット共通） ===
     function buildDisplayBody(clientName, date, exercisesData) {
       var f = 'font-family:Helvetica,Arial,sans-serif;box-sizing:border-box;';
       var body = '';
@@ -329,6 +540,65 @@
       return body;
     }
 
+    // =====================================================
+    // 📸 スクリーンショット用ビューを表示
+    // =====================================================
+    function showScreenshotView(clientName, date, exercisesData) {
+      const view   = document.getElementById('screenshotView');
+      const capture = document.getElementById('ssCapture');
+
+      // ヘッダーカード（クライアント名・日付）
+      let html = '';
+      html += '<div class="ss-card-header">';
+      html += '<h2>トレーニングプログラム</h2>';
+      html += '<div class="ss-client-row">';
+      html += '<span class="ss-client-name">' + (clientName || '') + ' 様</span>';
+      html += '<span class="ss-date">' + (date || '') + '</span>';
+      html += '</div>';
+      html += '</div>';
+
+      // 種目カード
+      exercisesData.forEach(function(ex, idx) {
+        const isLast = idx === exercisesData.length - 1;
+        html += '<div class="ss-exercise-card' + (isLast ? ' last' : '') + '" style="' + (isLast ? 'border-radius:0 0 12px 12px;' : '') + '">';
+        html += '<p class="ss-exercise-name"><span class="ss-part-badge">' + ex.part + '</span>' + ex.name + '</p>';
+        // セットグリッド
+        if (ex.sets && ex.sets.length > 0) {
+          html += '<div class="ss-sets-grid">';
+          ex.sets.forEach(function(s, i) {
+            const w = parseFloat(s.weight);
+            html += '<div class="ss-set-item">';
+            html += '<span class="ss-set-label">セット' + (i + 1) + '</span>';
+            html += '<span class="ss-set-value">' + (isNaN(w) ? '–' : w) + 'kg<br><span style="font-size:11px;font-weight:normal;color:#555;">× ' + (s.reps || '–') + '回</span></span>';
+            html += '</div>';
+          });
+          html += '</div>';
+        }
+        if (ex.remarks) {
+          html += '<div class="ss-remarks">📝 ' + ex.remarks + '</div>';
+        }
+        html += '</div>';
+      });
+
+      // フッター
+      html += '<div class="ss-footer">作成日：' + new Date().toLocaleDateString('ja-JP') + '</div>';
+
+      capture.innerHTML = html;
+      view.style.display = 'block';
+      view.scrollTop = 0;
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeScreenshotView() {
+      document.getElementById('screenshotView').style.display = 'none';
+      document.body.style.overflow = '';
+    }
+
+    // PDF保存タブを開く（スクリーンショットビュー内のボタン用）
+    function openPdfTab() {
+      window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
+    }
+
     // ===== PDF表示モード本体 =====
     if (PDF_MODE) {
       const raw = localStorage.getItem('__pdfData');
@@ -346,7 +616,6 @@
 
         (async function runPDF() {
           try {
-            // html2pdf.js を読み込み
             await new Promise(function(resolve, reject) {
               const s = document.createElement('script');
               s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
@@ -355,7 +624,6 @@
               document.head.appendChild(s);
             });
 
-            // PDF生成前にDOMレンダリングが完了するまで待機（iOS対策）
             st.style.display = 'none';
             await new Promise(function(r) { setTimeout(r, 800); });
 
@@ -379,7 +647,6 @@
             st.style.display = 'block';
             st.textContent = '📤 アップロード中...';
 
-            // base64変換
             const base64 = await new Promise(function(resolve, reject) {
               const reader = new FileReader();
               reader.onload  = function(e) { resolve(e.target.result.split(',')[1]); };
@@ -387,7 +654,6 @@
               reader.readAsDataURL(blob);
             });
 
-            // Google Driveへ送信（no-cors：iOSのCORSプリフライト「Load Failed」を回避）
             await fetch(pdfData.scriptURL, {
               method: 'POST',
               mode: 'no-cors',
@@ -398,7 +664,7 @@
                 pdfBase64: base64
               })
             });
-            // no-corsのためレスポンスは読めないが送信は完了
+
             st.textContent = '✅ 保存成功';
             st.style.background    = '#e8f5e9';
             st.style.borderColor   = '#4caf50';
@@ -428,12 +694,7 @@
       }, 2000);
     }
 
-    // ✅ 表示モード生成時：トレーニング記録を保存
-    async function sendTraining(date, clientName, exercises) {
-      await postToServer({ action: 'saveTraining', date, clientName, exercises });
-    }
-
-    // ✅ 手動「保存」ボタン：スプシ保存 → PDF表示タブを開く（iOS対応）
+    // ✅ 手動「保存」ボタン：スプシ保存 → スクリーンショットビュー表示
     async function saveToServer() {
       const clientName = document.getElementById('clientName').value.trim();
       const date       = document.getElementById('trainingDate').value;
@@ -448,7 +709,7 @@
         return;
       }
 
-      // データ収集・最高重量更新・localStorage書き込み（await前に実行）
+      // データ収集・最高重量更新・localStorage書き込み
       const exercisesData = collectExercises();
       updateMaxWeights(clientName, exercisesData);
       const displayBody = buildDisplayBody(clientName, date, exercisesData);
@@ -456,12 +717,12 @@
         clientName, date, displayBody, scriptURL: SCRIPT_URL
       }));
 
-      // ★ await前（ユーザー操作の直後）にウィンドウを開く → iOS ポップアップブロック回避 ★
-      window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
+      // ★ スクリーンショット用ビューを表示（新タブではなく同ページ内）
+      showScreenshotView(clientName, date, exercisesData);
 
       document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
 
-      // メモをスプシに保存（正規化キーで統一）
+      // メモをスプシに保存
       if (memo) {
         await postToServer({ action: 'saveMemo', clientName: normalizeKey(clientName), memo });
       }
@@ -473,7 +734,7 @@
       document.getElementById('driveStatus').textContent = '✅ 保存成功';
       setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
 
-      // 保存完了後、フォームデータをクリア（次回は新しい状態で開始）
+      // 保存完了後、フォームデータをクリア
       localStorage.removeItem('__formData');
     }
 
@@ -493,7 +754,6 @@
           }
         }
       });
-      // サーバーにも最高重量を同期（POST方式で確実に送信）
       if (weightsToSync.length > 0) {
         fetch(SCRIPT_URL, {
           method: 'POST',
@@ -503,7 +763,7 @@
       }
     }
 
-    // ✅ 共通送信関数（GET + no-cors でURLパラメータ送信）
+    // ✅ 共通送信関数
     async function postToServer(payload) {
       try {
         const url = SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
@@ -517,8 +777,8 @@
       }
     }
 
-    // ✅ スプレッドシートからデータ読み込み（上書き方式・重複防止）
-    let serverDataCache = null; // キャッシュで二重読み込みを防止
+    // ✅ スプレッドシートからデータ読み込み
+    let serverDataCache = null;
 
     async function loadFromServer() {
       document.getElementById('driveStatus').textContent = '📂 読み込み中...';
@@ -528,8 +788,6 @@
         serverDataCache = data;
 
         let count = 0;
-        // メモ: 正規化キーで上書き（マージしない → 重複防止）
-        // スプシ側の値が正：読み込んだ値でlocalStorageを上書きする
         Object.entries(data.memos || {}).forEach(([k, v]) => {
           if (k.startsWith('memo_')) {
             const normalizedKey = 'memo_' + normalizeKey(k.substring(5));
@@ -538,7 +796,6 @@
           count++;
         });
 
-        // 重量: 正規化キーで最大値を採用
         Object.entries(data.weights || {}).forEach(([k, v]) => {
           if (k.startsWith('record_')) {
             const rest = k.substring(7);
@@ -557,7 +814,6 @@
         document.getElementById('driveStatus').textContent = `✅ ${count}件読み込み完了 ${now}`;
         setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
 
-        // クライアント名が入力済みならメモを即反映
         const clientName = document.getElementById('clientName').value.trim();
         if (clientName) {
           document.getElementById('trainerMemo').value =
@@ -721,7 +977,7 @@
     function removeSet(button)      { button.closest('.set-group').remove(); autoSaveForm(); }
 
     // =====================================================
-    // 🔄 フォーム自動保存・復元（リロードしてもデータを保持）
+    // 🔄 フォーム自動保存・復元
     // =====================================================
     let autoSaveTimer = null;
     function autoSaveForm() {
@@ -769,35 +1025,28 @@
           const exElements = document.querySelectorAll('.exercise');
           const ex = exElements[exElements.length - 1];
 
-          // 部位を設定
           const bodyPartSelect = ex.querySelector('.body-part');
           if (exData.part) {
             bodyPartSelect.value = exData.part;
             bodyPartSelect.dispatchEvent(new Event('change'));
           }
-          // その他の場合
           if (exData.part === 'その他') {
             const bpInput = ex.querySelector('.body-part-other');
             if (bpInput) bpInput.value = exData.partOther || '';
             const exInput = ex.querySelector('.exercise-name-other');
             if (exInput) exInput.value = exData.exerciseOther || '';
           } else if (exData.exerciseName) {
-            // 種目を設定
             const exerciseSelect = ex.querySelector('.exercise-name');
             exerciseSelect.value = exData.exerciseName;
             exerciseSelect.dispatchEvent(new Event('change'));
           }
 
-          // 備考
           const remarksEl = ex.querySelector('textarea[placeholder="備考"]');
           if (remarksEl) remarksEl.value = exData.remarks || '';
 
-          // セット（最初の1セットは既にあるので、2セット目以降を追加）
           const setsDiv = ex.querySelector('.sets');
-          const addSetBtn = ex.querySelector('button');
           (exData.sets || []).forEach(function(setData, idx) {
             if (idx > 0) {
-              // セットを追加
               const newSet = document.createElement('div');
               newSet.className = 'set-group';
               newSet.innerHTML = '<input type="number" step="0.1" placeholder="重量(kg)">' +
@@ -820,18 +1069,13 @@
       }
     }
 
-    // ✅ 通常モードのみ初期化（PDF表示モードでは不要）
+    // ✅ 通常モードのみ初期化
     if (!PDF_MODE) {
-      // 表示モードボタン：?mode=pdf タブを開く（localStorage経由でデータ渡し）
       document.getElementById('viewModeBtn').addEventListener('click', function() {
         const clientName    = document.getElementById('clientName').value.trim();
         const date          = document.getElementById('trainingDate').value;
         const exercisesData = collectExercises();
-
-        // 過去最高重量を更新
         updateMaxWeights(clientName, exercisesData);
-
-        // データをlocalStorageに書き込んでから新タブを開く
         const displayBody = buildDisplayBody(clientName, date, exercisesData);
         localStorage.setItem('__pdfData', JSON.stringify({
           clientName, date, displayBody, scriptURL: SCRIPT_URL
@@ -839,7 +1083,6 @@
         window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
       });
 
-      // メモ入力 → 2秒後に自動保存（正規化キー使用）
       document.getElementById('trainerMemo').addEventListener('input', function() {
         const name = document.getElementById('clientName').value.trim();
         if (name) {
@@ -849,15 +1092,12 @@
         }
       });
 
-      // クライアント名入力 → キャッシュからメモを反映（二重fetch防止）
       document.getElementById('clientName').addEventListener('input', function() {
         const name = document.getElementById('clientName').value.trim();
         const normalized = normalizeKey(name);
 
-        // キャッシュがあればそこから反映、なければlocalStorage
         if (serverDataCache) {
           const memos = serverDataCache.memos || {};
-          // 正規化キーでスプシのメモを検索
           let memoVal = '';
           Object.entries(memos).forEach(([k, v]) => {
             if (k.startsWith('memo_') && normalizeKey(k.substring(5)) === normalized) {
@@ -871,21 +1111,16 @@
         }
       });
 
-      // フォーム復元（保存データがあれば復元、なければ空の種目を1つ追加）
       if (!restoreForm()) {
         addExercise();
       }
 
-      // 入力変更時に自動保存（イベント委任）
       document.getElementById('mainContainer').addEventListener('input', autoSaveForm);
       document.getElementById('mainContainer').addEventListener('change', autoSaveForm);
       document.getElementById('trainerMemo').addEventListener('input', autoSaveForm);
 
-      // ページ読み込み時にスプシから自動取得
       loadFromServer();
 
-      // 🔄 localStorageの既存重量データをスプシに一括アップロード（初回のみ）
-      // POST方式で送信（GETだとURLが長すぎて失敗するため）
       if (!localStorage.getItem('__weightsSynced2')) {
         const allWeights = {};
         for (let i = 0; i < localStorage.length; i++) {
@@ -904,7 +1139,6 @@
             }
           }
         }
-        // クライアントごとにPOSTで送信
         const clients = Object.entries(allWeights);
         if (clients.length > 0) {
           document.getElementById('driveStatus').textContent = '📤 重量データ同期中...';
