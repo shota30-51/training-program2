@@ -1034,19 +1034,24 @@
       document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
 
       // メモをスプシに保存
+      let memoOk = true;
       if (memo) {
-        await postToServer({ action: 'saveMemo', clientName: normalizeKey(clientName), memo });
+        memoOk = await postToServer({ action: 'saveMemo', clientName: normalizeKey(clientName), memo });
       }
       // 種目データをスプシに保存
+      let trainingOk = true;
       if (exercisesData.length > 0) {
-        await postToServer({ action: 'saveTraining', date, clientName: normalizeKey(clientName), exercises: exercisesData });
+        trainingOk = await postToServer({ action: 'saveTraining', date, clientName: normalizeKey(clientName), exercises: exercisesData });
       }
 
-      document.getElementById('driveStatus').textContent = '✅ 保存成功';
-      setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
-
-      // 保存完了後、フォームデータをクリア
-      localStorage.removeItem('__formData');
+      // ★ 保存が実際に成功したことを確認できた場合のみ、端末側の下書きを消す
+      if (memoOk && trainingOk) {
+        document.getElementById('driveStatus').textContent = '✅ 保存成功';
+        setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+        localStorage.removeItem('__formData');
+      } else {
+        document.getElementById('driveStatus').textContent = '❌ 保存に失敗しました（入力内容はこの端末に残っています。もう一度「保存」を押してください）';
+      }
     }
 
     // ✅ 種目の最高重量をlocalStorageに記録 + スプレッドシートにも同期
@@ -1075,16 +1080,27 @@
     }
 
     // ✅ 共通送信関数
+    // ★ 以前は mode:'no-cors' で送信結果を確認せずに「成功」扱いしていたため、
+    //   サーバー側でエラーが起きていても気づけず、端末の下書きだけが消えるという事故があった。
+    //   loadFromServer() と同じ通常のfetchでレスポンスを読み取り、実際の成否をtrue/falseで返す。
     async function postToServer(payload) {
       try {
         const url = SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
-        await fetch(url, { mode: 'no-cors' });
+        const res = await fetch(url);
+        const data = await res.json();
+        const ok = !!(data && data.status === 'ok');
         const now = new Date().toLocaleTimeString('ja-JP');
-        document.getElementById('driveStatus').textContent = `✅ 保存成功 ${now}`;
-        setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+        document.getElementById('driveStatus').textContent = ok
+          ? `✅ 保存成功 ${now}`
+          : `❌ 保存失敗（サーバー応答: ${(data && data.status) || '不明'}）`;
+        if (ok) {
+          setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+        }
+        return ok;
       } catch(err) {
         console.error('Save error:', err);
-        document.getElementById('driveStatus').textContent = '❌ 保存失敗';
+        document.getElementById('driveStatus').textContent = '❌ 保存失敗（通信エラー）';
+        return false;
       }
     }
 
@@ -1578,6 +1594,71 @@
       });
     }
 
+    // =====================================================
+    // 📄 カウンセリングシート専用：同じページ内でPDFを自動生成しDriveへアップロード
+    // （別タブを開く方式はスプシ保存後のawaitを挟むとポップアップブロックに
+    //   引っかかる恐れがあるため、非表示のDOMを使ってこのページ内で完結させる）
+    // =====================================================
+    async function generateAndUploadPdf(pdfData) {
+      if (!window.html2pdf) {
+        await new Promise(function(resolve, reject) {
+          const s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+          s.onload = resolve;
+          s.onerror = function() { reject(new Error('ライブラリ読込失敗')); };
+          document.head.appendChild(s);
+        });
+      }
+
+      const container = document.createElement('div');
+      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:750px;background:white;padding:20px 30px;box-sizing:border-box;font-family:Segoe UI,Helvetica Neue,sans-serif;';
+      container.innerHTML = pdfData.displayBody;
+      document.body.appendChild(container);
+
+      try {
+        const blob = await html2pdf().set({
+          margin: [10, 15, 10, 15],
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: {
+            scale: 2,
+            useCORS: false,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 794,
+            logging: false
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['div'] }
+        }).from(container).outputPdf('blob');
+
+        const base64 = await new Promise(function(resolve, reject) {
+          const reader = new FileReader();
+          reader.onload  = function(e) { resolve(e.target.result.split(',')[1]); };
+          reader.onerror = function() { reject(new Error('変換失敗')); };
+          reader.readAsDataURL(blob);
+        });
+
+        // ★ GASのdoPostはCORSプリフライトに対応していないため、ここは
+        //   no-corsでの送信となり、送信自体が成功したかまでしか確認できない
+        //   （GAS側での書き込み結果までは確認不可。この制約は既存のトレーニング
+        //   PDF保存フローと同じ）
+        await fetch(pdfData.scriptURL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify({
+            action: pdfData.type === 'counseling' ? 'saveCounselingPDF' : 'savePDFBase64',
+            clientName: pdfData.clientName,
+            date: pdfData.date,
+            pdfBase64: base64
+          })
+        });
+        return true;
+      } finally {
+        container.remove();
+      }
+    }
+
     // ✅ カウンセリングシートを別タブでPDF表示
     function viewCounseling() {
       const data = collectCounseling();
@@ -1602,18 +1683,37 @@
       }
 
       const displayBody = buildCounselingDisplayBody(data);
-      localStorage.setItem('__pdfData', JSON.stringify({
-        type: 'counseling', clientName: data.name, date: data.date, displayBody, scriptURL: SCRIPT_URL
-      }));
+      const pdfData = { type: 'counseling', clientName: data.name, date: data.date, displayBody, scriptURL: SCRIPT_URL };
+      localStorage.setItem('__pdfData', JSON.stringify(pdfData));
 
       showCounselingScreenshotView(data);
 
       document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
-      await postToServer(Object.assign({ action: 'saveCounseling' }, data, { clientName: normalizeKey(data.name) }));
-      document.getElementById('driveStatus').textContent = '✅ 保存成功';
-      setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+      const sheetOk = await postToServer(Object.assign({ action: 'saveCounseling' }, data, { clientName: normalizeKey(data.name) }));
 
-      localStorage.removeItem('__counselingFormData');
+      // ★ スプシ保存が確認できなければ、ここで止めて端末側の下書きは残す
+      if (!sheetOk) {
+        document.getElementById('driveStatus').textContent = '❌ 保存に失敗しました（入力内容はこの端末に残っています。もう一度「保存」を押してください）';
+        return;
+      }
+
+      // ★ スプシ保存に成功したら、続けてPDFを自動生成してGoogleドライブへ保存
+      //   （トレーニング記録と違い、カウンセリングシートは「保存」1回でスプシ・Drive両方に保存する仕様）
+      document.getElementById('driveStatus').textContent = '📄 PDFを作成してDriveに保存中...';
+      let pdfOk = false;
+      try {
+        pdfOk = await generateAndUploadPdf(pdfData);
+      } catch (err) {
+        console.error('Counseling PDF error:', err);
+      }
+
+      if (pdfOk) {
+        document.getElementById('driveStatus').textContent = '✅ スプシ・Driveどちらにも保存しました';
+        localStorage.removeItem('__counselingFormData');
+      } else {
+        document.getElementById('driveStatus').textContent = '⚠️ スプシには保存済みです。Driveへの保存に失敗したので、下の画面の「📄 PDF保存」からもう一度お試しください';
+      }
+      setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 6000);
     }
 
     // =====================================================
