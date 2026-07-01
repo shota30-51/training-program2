@@ -252,9 +252,10 @@
 
     /* ===== スクリーンショット対象エリア ===== */
     #ssCapture {
-      max-width: 540px;
-      margin: 16px auto;
-      padding: 0 12px 80px 12px;
+      max-width: calc(100% - 24px);
+      margin: 32px auto 0 auto;
+      padding: 0 0 80px 0;
+      transform-origin: top center;
     }
 
     .ss-card-header {
@@ -588,9 +589,23 @@
       html += '<div class="ss-footer">作成日：' + new Date().toLocaleDateString('ja-JP') + '</div>';
 
       capture.innerHTML = html;
+      capture.style.transform = 'scale(1)';
       view.style.display = 'block';
       view.scrollTop = 0;
       document.body.style.overflow = 'hidden';
+
+      // コンテンツが画面に収まらない場合は自動縮小
+      requestAnimationFrame(function() {
+        const headerH   = document.querySelector('.ss-header').offsetHeight;
+        const bottomH   = document.querySelector('.ss-bottom-bar').offsetHeight;
+        const available = window.innerHeight - headerH - bottomH - 32; // 余白32px
+        const contentH  = capture.scrollHeight;
+        if (contentH > available) {
+          const scale = Math.max(0.5, available / contentH);
+          capture.style.transform = 'scale(' + scale + ')';
+          capture.style.marginTop = '16px';
+        }
+      });
     }
 
     function closeScreenshotView() {
