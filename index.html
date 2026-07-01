@@ -837,6 +837,17 @@
         if (clientName) {
           document.getElementById('trainerMemo').value =
             localStorage.getItem('memo_' + normalizeKey(clientName)) || '';
+
+          // 読み込み完了後、表示中の種目の過去最高重量を再表示（タイミング競合の修正）
+          document.querySelectorAll('.exercise').forEach(function(ex) {
+            const sel = ex.querySelector('.exercise-name');
+            const disp = ex.querySelector('.max-weight');
+            if (sel && sel.value && disp) {
+              const key = 'record_' + normalizeKey(clientName) + '_' + sel.value;
+              const w = localStorage.getItem(key);
+              disp.textContent = w ? '過去最高重量：' + w + ' kg' : '過去記録なし';
+            }
+          });
         }
       } catch(err) {
         console.error('Load error:', err);
