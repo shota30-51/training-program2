@@ -1005,6 +1005,22 @@
       }, 2000);
     }
 
+    // ✅ トレーニング記録の「クライアント名」とカウンセリングシートの「氏名」が
+    //   一致しているか確認する。片方が未入力なら問題なし。両方入力済みで
+    //   名前が異なる場合はエラーを表示して保存をブロックする（Driveの保存先
+    //   フォルダをクライアント名で検索する仕様のため、名前がズレると誤った
+    //   フォルダ・別人のデータとして扱われてしまうのを防ぐ）
+    function checkNameMatch() {
+      const trainingName   = document.getElementById('clientName').value.trim();
+      const counselingName = document.getElementById('cName').value.trim();
+      if (!trainingName || !counselingName) return true;
+      if (normalizeKey(trainingName) === normalizeKey(counselingName)) return true;
+
+      document.getElementById('driveStatus').textContent =
+        `⚠️ 名前が一致しません（トレーニング記録：${trainingName} / カウンセリング：${counselingName}）。同じ方の場合は名前を揃えてください`;
+      return false;
+    }
+
     // ✅ 手動「保存」ボタン：スプシ保存 → スクリーンショットビュー表示
     async function saveToServer() {
       const clientName = document.getElementById('clientName').value.trim();
@@ -1017,6 +1033,9 @@
       }
       if (!date) {
         document.getElementById('driveStatus').textContent = '⚠️ 日付を選択してください';
+        return;
+      }
+      if (!checkNameMatch()) {
         return;
       }
 
@@ -1681,6 +1700,9 @@
         document.getElementById('driveStatus').textContent = '⚠️ 実施日を選択してください';
         return;
       }
+      if (!checkNameMatch()) {
+        return;
+      }
 
       const displayBody = buildCounselingDisplayBody(data);
       const pdfData = { type: 'counseling', clientName: data.name, date: data.date, displayBody, scriptURL: SCRIPT_URL };
@@ -1762,6 +1784,13 @@
           });
           document.getElementById('trainerMemo').value = memoVal || localStorage.getItem('memo_' + normalized) || '';
           if (memoVal) localStorage.setItem('memo_' + normalized, memoVal);
+
+          // ★ 過去のカウンセリング記録（スプシ）があれば、カウンセリングタブに常に上書きで自動反映
+          const counselingRecords = serverDataCache.counseling || {};
+          const counselingMatch = counselingRecords[normalized];
+          if (counselingMatch) {
+            applyCounseling(counselingMatch);
+          }
         } else {
           document.getElementById('trainerMemo').value = localStorage.getItem('memo_' + normalized) || '';
         }
