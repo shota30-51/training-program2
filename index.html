@@ -582,6 +582,23 @@
             </select>
           </div>
         </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>どうやってNUDEを知っていただきましたか？</label>
+            <select id="cReferral">
+              <option value="">選択してください</option>
+              <option value="Instagram">Instagram</option>
+              <option value="Instagram広告">Instagram広告</option>
+              <option value="Google検索・口コミ">Google検索・口コミ</option>
+              <option value="知人の紹介">知人の紹介</option>
+              <option value="チラシ">チラシ</option>
+              <option value="前を通って気になった">前を通って気になった</option>
+              <option value="HPを見た">HPを見た</option>
+              <option value="その他">その他</option>
+            </select>
+            <input type="text" id="cReferralOther" placeholder="自由入力" style="display:none;margin-top:6px;">
+          </div>
+        </div>
       </div>
 
       <div class="counseling-section">
@@ -624,6 +641,19 @@
             <label>希望頻度</label>
             <input type="text" id="cFrequency" placeholder="例：週2回">
           </div>
+          <div class="form-field">
+            <label>食事管理を頑張れそうか</label>
+            <select id="cDietWillingness">
+              <option value="">選択してください</option>
+              <option value="頑張れそう">頑張れそう</option>
+              <option value="どちらとも言えない">どちらとも言えない</option>
+              <option value="難しそう">難しそう</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label>食事内容（メモ）</label>
+          <textarea id="cDietNotes" placeholder="普段の食事内容や状況など"></textarea>
         </div>
         <div class="form-field" style="margin-bottom:12px;">
           <label>なりたい姿・目標</label>
@@ -1488,6 +1518,8 @@
     // =====================================================
     // 📝 カウンセリングシート：データ収集
     // =====================================================
+    const REFERRAL_FIXED_OPTIONS = ['Instagram', 'Instagram広告', 'Google検索・口コミ', '知人の紹介', 'チラシ', '前を通って気になった', 'HPを見た'];
+
     function collectCounseling() {
       const purposes = Array.from(document.querySelectorAll('#cPurposeGroup input:checked')).map(el => el.value);
       const by = document.getElementById('cBirthYear').value;
@@ -1496,11 +1528,16 @@
       const birth = (by && bm && bd)
         ? by + '-' + String(bm).padStart(2, '0') + '-' + String(bd).padStart(2, '0')
         : '';
+      const referralSelect = document.getElementById('cReferral').value;
+      const referral = referralSelect === 'その他'
+        ? document.getElementById('cReferralOther').value.trim()
+        : referralSelect;
       return {
         name: document.getElementById('cName').value.trim(),
         birth: birth,
         age: document.getElementById('cAge').value,
         gender: document.getElementById('cGender').value,
+        referral: referral,
         date: document.getElementById('cDate').value,
         height: document.getElementById('cHeight').value,
         weight: document.getElementById('cWeight').value,
@@ -1508,6 +1545,8 @@
         medicalHistory: document.getElementById('cMedicalHistory').value.trim(),
         purposes: purposes,
         frequency: document.getElementById('cFrequency').value.trim(),
+        dietWillingness: document.getElementById('cDietWillingness').value,
+        dietNotes: document.getElementById('cDietNotes').value.trim(),
         goal: document.getElementById('cGoal').value.trim(),
         notes: document.getElementById('cNotes').value.trim()
       };
@@ -1522,12 +1561,25 @@
       document.getElementById('cBirthDay').value   = birthParts[2] ? String(parseInt(birthParts[2], 10)) : '';
       document.getElementById('cAge').value = data.age || '';
       document.getElementById('cGender').value = data.gender || '';
+      const referral = data.referral || '';
+      const cReferralOther = document.getElementById('cReferralOther');
+      if (referral && REFERRAL_FIXED_OPTIONS.indexOf(referral) === -1) {
+        document.getElementById('cReferral').value = 'その他';
+        cReferralOther.value = referral;
+        cReferralOther.style.display = 'block';
+      } else {
+        document.getElementById('cReferral').value = referral;
+        cReferralOther.value = '';
+        cReferralOther.style.display = 'none';
+      }
       document.getElementById('cDate').value = data.date || '';
       document.getElementById('cHeight').value = data.height || '';
       document.getElementById('cWeight').value = data.weight || '';
       document.getElementById('cPosture').value = data.posture || '';
       document.getElementById('cMedicalHistory').value = data.medicalHistory || '';
       document.getElementById('cFrequency').value = data.frequency || '';
+      document.getElementById('cDietWillingness').value = data.dietWillingness || '';
+      document.getElementById('cDietNotes').value = data.dietNotes || '';
       document.getElementById('cGoal').value = data.goal || '';
       document.getElementById('cNotes').value = data.notes || '';
       const purposes = data.purposes || [];
@@ -1563,7 +1615,8 @@
       body += section('基本情報',
         row('生年月日', data.birth) +
         row('年齢', data.age ? data.age + ' 歳' : '') +
-        row('性別', data.gender)
+        row('性別', data.gender) +
+        row('流入経路', data.referral)
       );
 
       body += section('身体情報',
@@ -1576,6 +1629,8 @@
       body += section('目標・要望',
         row('目的', (data.purposes || []).join('、')) +
         row('希望頻度', data.frequency) +
+        row('食事管理', data.dietWillingness) +
+        row('食事内容', data.dietNotes) +
         row('なりたい姿・目標', data.goal) +
         row('その他要望', data.notes)
       );
@@ -1611,7 +1666,8 @@
       html += infoCard('基本情報',
         infoRow('生年月日', data.birth) +
         infoRow('年齢', data.age ? data.age + ' 歳' : '') +
-        infoRow('性別', data.gender), false);
+        infoRow('性別', data.gender) +
+        infoRow('流入経路', data.referral), false);
 
       html += infoCard('身体情報',
         infoRow('身長', data.height ? data.height + ' cm' : '') +
@@ -1622,6 +1678,8 @@
       html += infoCard('目標・要望',
         infoRow('目的', (data.purposes || []).join('、')) +
         infoRow('希望頻度', data.frequency) +
+        infoRow('食事管理', data.dietWillingness) +
+        infoRow('食事内容', data.dietNotes) +
         infoRow('なりたい姿・目標', data.goal) +
         infoRow('その他要望', data.notes), true);
 
@@ -1784,12 +1842,17 @@
       document.getElementById('cBirthDay').value = '';
       document.getElementById('cAge').value = '';
       document.getElementById('cGender').value = '';
+      document.getElementById('cReferral').value = '';
+      document.getElementById('cReferralOther').value = '';
+      document.getElementById('cReferralOther').style.display = 'none';
       document.getElementById('cDate').value = '';
       document.getElementById('cHeight').value = '';
       document.getElementById('cWeight').value = '';
       document.getElementById('cPosture').value = '';
       document.getElementById('cMedicalHistory').value = '';
       document.getElementById('cFrequency').value = '';
+      document.getElementById('cDietWillingness').value = '';
+      document.getElementById('cDietNotes').value = '';
       document.getElementById('cGoal').value = '';
       document.getElementById('cNotes').value = '';
       document.querySelectorAll('#cPurposeGroup input').forEach(function(el) { el.checked = false; });
@@ -1906,6 +1969,10 @@
       // ===== カウンセリングシート：初期化 =====
       initBirthSelects();
       restoreCounseling();
+
+      document.getElementById('cReferral').addEventListener('change', function() {
+        document.getElementById('cReferralOther').style.display = (this.value === 'その他') ? 'block' : 'none';
+      });
 
       document.getElementById('counselingTab').addEventListener('input', autoSaveCounseling);
       document.getElementById('counselingTab').addEventListener('change', autoSaveCounseling);
