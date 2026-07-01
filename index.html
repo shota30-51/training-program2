@@ -158,10 +158,6 @@
       background-color: #c62828;
     }
 
-    #viewModeBtn {
-      background-color: #4a148c;
-      margin-top: 30px;
-    }
 
     .button-area {
       text-align: center;
@@ -396,27 +392,244 @@
       border-radius: 8px;
       margin: 0;
     }
+
+    /* =====================================================
+       📝 タブ切替（トレーニング記録 / カウンセリングシート）
+    ===================================================== */
+    .tab-nav {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 10px;
+      font-size: 15px;
+      font-weight: bold;
+      background: #e8eaf6;
+      color: #1a237e;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 0;
+    }
+
+    .tab-btn:hover {
+      background: #c5cae9;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(to right, #1a237e, #0d47a1);
+      color: white;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ===== カウンセリングシート専用スタイル ===== */
+    .counseling-section {
+      border: 1px solid #ccc;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      background-color: #f9f9f9;
+    }
+
+    .counseling-section h3 {
+      margin: 0 0 14px 0;
+      font-size: 16px;
+      color: #1a237e;
+      border-bottom: 2px solid #e8eaf6;
+      padding-bottom: 8px;
+    }
+
+    .form-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      margin-bottom: 12px;
+    }
+
+    .form-field {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .form-field label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 4px;
+    }
+
+    .form-field input,
+    .form-field select,
+    .form-field textarea {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 15px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-family: inherit;
+    }
+
+    .form-field textarea {
+      height: 70px;
+      resize: vertical;
+    }
+
+    .checkbox-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 14px;
+      font-weight: normal;
+      color: #333;
+    }
+
+    .checkbox-label input {
+      width: auto;
+    }
   </style>
 </head>
 <body>
   <div class="container" id="mainContainer">
     <h1 class="title">トレーニングプログラム記録</h1>
 
-    <div class="client-info">
-      <input type="text" id="clientName" placeholder="クライアント名">
-      <input type="date" id="trainingDate">
+    <div class="tab-nav">
+      <button type="button" class="tab-btn active" id="tabBtnTraining" onclick="switchTab('training')">📋 トレーニング記録</button>
+      <button type="button" class="tab-btn" id="tabBtnCounseling" onclick="switchTab('counseling')">📝 カウンセリングシート</button>
     </div>
-    <div id="exercises"></div>
-    <div class="button-area">
-      <button onclick="addExercise(); autoSaveForm();">種目を追加</button>
-      <button id="viewModeBtn">表示モード（別タブ）</button>
+
+    <div id="trainingTab" class="tab-content active">
+      <div class="client-info">
+        <input type="text" id="clientName" placeholder="クライアント名">
+        <input type="date" id="trainingDate">
+      </div>
+      <div id="exercises"></div>
+      <div class="button-area">
+        <button onclick="addExercise(); autoSaveForm();">種目を追加</button>
+      </div>
+    </div>
+
+    <div id="counselingTab" class="tab-content">
+      <div class="counseling-section">
+        <h3>基本情報</h3>
+        <div class="form-row">
+          <div class="form-field">
+            <label>氏名</label>
+            <input type="text" id="cName" placeholder="山田 太郎">
+          </div>
+          <div class="form-field">
+            <label>フリガナ</label>
+            <input type="text" id="cKana" placeholder="ヤマダ タロウ">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>生年月日</label>
+            <input type="date" id="cBirth">
+          </div>
+          <div class="form-field">
+            <label>年齢</label>
+            <input type="number" id="cAge" placeholder="例：30">
+          </div>
+          <div class="form-field">
+            <label>性別</label>
+            <select id="cGender">
+              <option value="">選択してください</option>
+              <option value="男性">男性</option>
+              <option value="女性">女性</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>連絡先（電話・メール）</label>
+            <input type="text" id="cContact" placeholder="090-XXXX-XXXX / example@mail.com">
+          </div>
+          <div class="form-field">
+            <label>実施日</label>
+            <input type="date" id="cDate">
+          </div>
+        </div>
+      </div>
+
+      <div class="counseling-section">
+        <h3>身体情報</h3>
+        <div class="form-row">
+          <div class="form-field">
+            <label>身長 (cm)</label>
+            <input type="number" step="0.1" id="cHeight">
+          </div>
+          <div class="form-field">
+            <label>体重 (kg)</label>
+            <input type="number" step="0.1" id="cWeight">
+          </div>
+          <div class="form-field">
+            <label>体脂肪率 (%)</label>
+            <input type="number" step="0.1" id="cBodyFat">
+          </div>
+        </div>
+        <div class="form-field">
+          <label>既往歴・怪我の有無</label>
+          <textarea id="cMedicalHistory" placeholder="持病、手術歴、現在治療中の怪我など"></textarea>
+        </div>
+      </div>
+
+      <div class="counseling-section">
+        <h3>目標・要望</h3>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label>トレーニングの目的（複数選択可）</label>
+          <div class="checkbox-group" id="cPurposeGroup">
+            <label class="checkbox-label"><input type="checkbox" value="ダイエット・減量">ダイエット・減量</label>
+            <label class="checkbox-label"><input type="checkbox" value="筋力アップ">筋力アップ</label>
+            <label class="checkbox-label"><input type="checkbox" value="健康維持・改善">健康維持・改善</label>
+            <label class="checkbox-label"><input type="checkbox" value="姿勢改善">姿勢改善</label>
+            <label class="checkbox-label"><input type="checkbox" value="リハビリ">リハビリ</label>
+            <label class="checkbox-label"><input type="checkbox" value="大会・イベント対策">大会・イベント対策</label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-field">
+            <label>希望頻度</label>
+            <input type="text" id="cFrequency" placeholder="例：週2回">
+          </div>
+        </div>
+        <div class="form-field" style="margin-bottom:12px;">
+          <label>なりたい姿・目標</label>
+          <textarea id="cGoal" placeholder="具体的な目標（例：3ヶ月で-5kg、腹筋を割りたい など）"></textarea>
+        </div>
+        <div class="form-field">
+          <label>その他要望・備考</label>
+          <textarea id="cNotes" placeholder="その他伝えておきたいこと"></textarea>
+        </div>
+      </div>
+
+      <div class="button-area">
+        <button id="counselingViewModeBtn">表示モード（別タブ）</button>
+      </div>
     </div>
 
     <!-- ===== スプレッドシート同期バー ===== -->
     <div class="drive-section">
-      <span class="drive-label">スプレッドシート同期</span>
+      <span class="drive-label" id="driveLabel">スプレッドシート同期</span>
       <div class="drive-buttons">
-        <button id="driveSaveBtn" onclick="saveToServer()">保存</button>
+        <button id="driveSaveBtn" onclick="handleSaveClick()">保存</button>
       </div>
       <span id="driveStatus">待機中</span>
     </div>
@@ -442,7 +655,7 @@
     </div>
 
     <div class="ss-bottom-bar">
-      <button class="ss-pdf-btn" onclick="openPdfTab()">📄 PDF保存</button>
+      <button class="ss-pdf-btn" onclick="savePdfFromScreenshot()">📄 PDF保存</button>
       <button class="ss-close-btn" onclick="closeScreenshotView()">✕ 閉じる</button>
     </div>
   </div>
@@ -613,9 +826,75 @@
       document.body.style.overflow = '';
     }
 
-    // PDF保存タブを開く（スクリーンショットビュー内のボタン用）
-    function openPdfTab() {
-      window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
+    // スクリーンショット用画面のコンテンツをそのままPDF保存
+    async function savePdfFromScreenshot() {
+      const btn = document.querySelector('.ss-pdf-btn');
+      const clientName = document.getElementById('clientName').value.trim();
+      const date = document.getElementById('trainingDate').value;
+
+      btn.textContent = '⏳ 生成中...';
+      btn.disabled = true;
+
+      try {
+        // html2pdf.js を読み込み（未読み込みの場合）
+        if (!window.html2pdf) {
+          await new Promise(function(resolve, reject) {
+            const s = document.createElement('script');
+            s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+            s.onload = resolve;
+            s.onerror = function() { reject(new Error('ライブラリ読込失敗')); };
+            document.head.appendChild(s);
+          });
+        }
+
+        await new Promise(function(r) { setTimeout(r, 300); });
+
+        const el = document.getElementById('ssCapture');
+        const blob = await html2pdf().set({
+          margin: [8, 8, 8, 8],
+          image: { type: 'jpeg', quality: 0.95 },
+          html2canvas: {
+            scale: 2,
+            useCORS: false,
+            backgroundColor: '#f0f4f8',
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: el.offsetWidth,
+            logging: false
+          },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+          pagebreak: { mode: ['css', 'legacy'], avoid: ['div'] }
+        }).from(el).outputPdf('blob');
+
+        btn.textContent = '📤 アップロード中...';
+
+        const base64 = await new Promise(function(resolve, reject) {
+          const reader = new FileReader();
+          reader.onload = function(e) { resolve(e.target.result.split(',')[1]); };
+          reader.onerror = function() { reject(new Error('変換失敗')); };
+          reader.readAsDataURL(blob);
+        });
+
+        await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify({
+            action: 'savePDFBase64',
+            clientName: clientName,
+            date: date,
+            pdfBase64: base64
+          })
+        });
+
+        btn.textContent = '✅ 保存完了';
+        setTimeout(function() {
+          btn.textContent = '📄 PDF保存';
+          btn.disabled = false;
+        }, 3000);
+      } catch(err) {
+        btn.textContent = '❌ 失敗: ' + err.message;
+        btn.disabled = false;
+      }
     }
 
     // ===== PDF表示モード本体 =====
@@ -677,7 +956,7 @@
               method: 'POST',
               mode: 'no-cors',
               body: JSON.stringify({
-                action: 'savePDFBase64',
+                action: pdfData.type === 'counseling' ? 'saveCounselingPDF' : 'savePDFBase64',
                 clientName: pdfData.clientName,
                 date: pdfData.date,
                 pdfBase64: base64
@@ -733,7 +1012,7 @@
       updateMaxWeights(clientName, exercisesData);
       const displayBody = buildDisplayBody(clientName, date, exercisesData);
       localStorage.setItem('__pdfData', JSON.stringify({
-        clientName, date, displayBody, scriptURL: SCRIPT_URL
+        type: 'training', clientName, date, displayBody, scriptURL: SCRIPT_URL
       }));
 
       // ★ スクリーンショット用ビューを表示（新タブではなく同ページ内）
@@ -1099,20 +1378,254 @@
       }
     }
 
+    // =====================================================
+    // 📝 タブ切替（トレーニング記録 ⇄ カウンセリングシート）
+    // =====================================================
+    let currentTab = 'training';
+
+    function switchTab(tab) {
+      currentTab = tab;
+      document.getElementById('trainingTab').classList.toggle('active', tab === 'training');
+      document.getElementById('counselingTab').classList.toggle('active', tab === 'counseling');
+      document.getElementById('tabBtnTraining').classList.toggle('active', tab === 'training');
+      document.getElementById('tabBtnCounseling').classList.toggle('active', tab === 'counseling');
+      const memoSection = document.getElementById('trainerMemoSection');
+      if (memoSection) memoSection.style.display = (tab === 'training') ? 'block' : 'none';
+      document.getElementById('driveLabel').textContent = (tab === 'training') ? 'スプレッドシート同期' : 'カウンセリング保存';
+      localStorage.setItem('__activeTab', tab);
+    }
+
+    // 保存ボタン：現在のタブに応じて保存処理を振り分け
+    function handleSaveClick() {
+      if (currentTab === 'counseling') {
+        saveCounselingToServer();
+      } else {
+        saveToServer();
+      }
+    }
+
+    // =====================================================
+    // 📝 カウンセリングシート：データ収集
+    // =====================================================
+    function collectCounseling() {
+      const purposes = Array.from(document.querySelectorAll('#cPurposeGroup input:checked')).map(el => el.value);
+      return {
+        name: document.getElementById('cName').value.trim(),
+        kana: document.getElementById('cKana').value.trim(),
+        birth: document.getElementById('cBirth').value,
+        age: document.getElementById('cAge').value,
+        gender: document.getElementById('cGender').value,
+        contact: document.getElementById('cContact').value.trim(),
+        date: document.getElementById('cDate').value,
+        height: document.getElementById('cHeight').value,
+        weight: document.getElementById('cWeight').value,
+        bodyFat: document.getElementById('cBodyFat').value,
+        medicalHistory: document.getElementById('cMedicalHistory').value.trim(),
+        purposes: purposes,
+        frequency: document.getElementById('cFrequency').value.trim(),
+        goal: document.getElementById('cGoal').value.trim(),
+        notes: document.getElementById('cNotes').value.trim()
+      };
+    }
+
+    function applyCounseling(data) {
+      if (!data) return;
+      document.getElementById('cName').value = data.name || '';
+      document.getElementById('cKana').value = data.kana || '';
+      document.getElementById('cBirth').value = data.birth || '';
+      document.getElementById('cAge').value = data.age || '';
+      document.getElementById('cGender').value = data.gender || '';
+      document.getElementById('cContact').value = data.contact || '';
+      document.getElementById('cDate').value = data.date || '';
+      document.getElementById('cHeight').value = data.height || '';
+      document.getElementById('cWeight').value = data.weight || '';
+      document.getElementById('cBodyFat').value = data.bodyFat || '';
+      document.getElementById('cMedicalHistory').value = data.medicalHistory || '';
+      document.getElementById('cFrequency').value = data.frequency || '';
+      document.getElementById('cGoal').value = data.goal || '';
+      document.getElementById('cNotes').value = data.notes || '';
+      const purposes = data.purposes || [];
+      document.querySelectorAll('#cPurposeGroup input').forEach(el => {
+        el.checked = purposes.indexOf(el.value) !== -1;
+      });
+    }
+
+    // =====================================================
+    // 📝 カウンセリングシート：表示用HTML生成（PDF共通）
+    // =====================================================
+    function buildCounselingDisplayBody(data) {
+      var f = 'font-family:Helvetica,Arial,sans-serif;box-sizing:border-box;';
+      var row = function(label, value) {
+        if (!value) return '';
+        return '<tr><td style="padding:4px 8px;color:#666;white-space:nowrap;vertical-align:top;">' + label + '</td>' +
+               '<td style="padding:4px 8px;white-space:pre-wrap;">' + value + '</td></tr>';
+      };
+      var section = function(title, rowsHtml) {
+        if (!rowsHtml) return '';
+        return '<div style="border:1px solid #bbb;padding:8px 10px;border-radius:6px;margin-bottom:8px;background:#f9f9f9;page-break-inside:avoid;break-inside:avoid;' + f + '">' +
+               '<p style="font-weight:bold;margin:0 0 4px 0;font-size:13px;color:#1a237e;">' + title + '</p>' +
+               '<table style="width:100%;font-size:12px;' + f + '">' + rowsHtml + '</table></div>';
+      };
+
+      var body = '';
+      body += '<h1 style="text-align:center;background:#1a237e;color:white;padding:10px;border-radius:6px;font-size:18px;margin:0 0 12px 0;' + f + '">カウンセリングシート</h1>';
+      body += '<table style="width:100%;margin-bottom:12px;font-size:13px;' + f + '">';
+      body += '<tr><td>氏名：' + (data.name ? data.name + ' 様' : '') + '</td>';
+      body += '<td style="text-align:right;">実施日：' + (data.date || '') + '</td></tr>';
+      body += '</table>';
+
+      body += section('基本情報',
+        row('フリガナ', data.kana) +
+        row('生年月日', data.birth) +
+        row('年齢', data.age ? data.age + ' 歳' : '') +
+        row('性別', data.gender) +
+        row('連絡先', data.contact)
+      );
+
+      body += section('身体情報',
+        row('身長', data.height ? data.height + ' cm' : '') +
+        row('体重', data.weight ? data.weight + ' kg' : '') +
+        row('体脂肪率', data.bodyFat ? data.bodyFat + ' %' : '') +
+        row('既往歴・怪我', data.medicalHistory)
+      );
+
+      body += section('目標・要望',
+        row('目的', (data.purposes || []).join('、')) +
+        row('希望頻度', data.frequency) +
+        row('なりたい姿・目標', data.goal) +
+        row('その他要望', data.notes)
+      );
+
+      return body;
+    }
+
+    // =====================================================
+    // 📸 カウンセリングシート：スクリーンショット用ビュー表示
+    // =====================================================
+    function showCounselingScreenshotView(data) {
+      const view = document.getElementById('screenshotView');
+      const capture = document.getElementById('ssCapture');
+
+      var infoRow = function(label, value) {
+        if (!value) return '';
+        return '<div style="display:flex;font-size:13px;margin:4px 0;"><span style="min-width:110px;color:#888;">' + label + '</span><span style="flex:1;white-space:pre-wrap;">' + value + '</span></div>';
+      };
+      var infoCard = function(title, rowsHtml, isLast) {
+        if (!rowsHtml) return '';
+        return '<div class="ss-exercise-card" style="' + (isLast ? 'border-radius:0 0 12px 12px;' : '') + '">' +
+               '<p class="ss-exercise-name">' + title + '</p>' + rowsHtml + '</div>';
+      };
+
+      let html = '';
+      html += '<div class="ss-card-header">';
+      html += '<h2>カウンセリングシート</h2>';
+      html += '<div class="ss-client-row">';
+      html += '<span class="ss-client-name">' + (data.name || '') + ' 様</span>';
+      html += '<span class="ss-date">' + (data.date || '') + '</span>';
+      html += '</div></div>';
+
+      html += infoCard('基本情報',
+        infoRow('フリガナ', data.kana) +
+        infoRow('生年月日', data.birth) +
+        infoRow('年齢', data.age ? data.age + ' 歳' : '') +
+        infoRow('性別', data.gender) +
+        infoRow('連絡先', data.contact), false);
+
+      html += infoCard('身体情報',
+        infoRow('身長', data.height ? data.height + ' cm' : '') +
+        infoRow('体重', data.weight ? data.weight + ' kg' : '') +
+        infoRow('体脂肪率', data.bodyFat ? data.bodyFat + ' %' : '') +
+        infoRow('既往歴・怪我', data.medicalHistory), false);
+
+      html += infoCard('目標・要望',
+        infoRow('目的', (data.purposes || []).join('、')) +
+        infoRow('希望頻度', data.frequency) +
+        infoRow('なりたい姿・目標', data.goal) +
+        infoRow('その他要望', data.notes), true);
+
+      html += '<div class="ss-footer">作成日：' + new Date().toLocaleDateString('ja-JP') + '</div>';
+
+      capture.innerHTML = html;
+      capture.style.transform = 'scale(1)';
+      capture.style.marginTop = '';
+      view.style.display = 'block';
+      view.scrollTop = 0;
+      document.body.style.overflow = 'hidden';
+
+      requestAnimationFrame(function() {
+        const headerH   = document.querySelector('.ss-header').offsetHeight;
+        const bottomH   = document.querySelector('.ss-bottom-bar').offsetHeight;
+        const available = window.innerHeight - headerH - bottomH - 32;
+        const contentH  = capture.scrollHeight;
+        if (contentH > available) {
+          const scale = Math.max(0.5, available / contentH);
+          capture.style.transform = 'scale(' + scale + ')';
+          capture.style.marginTop = '16px';
+        }
+      });
+    }
+
+    // ✅ カウンセリングシートを別タブでPDF表示
+    function viewCounseling() {
+      const data = collectCounseling();
+      const displayBody = buildCounselingDisplayBody(data);
+      localStorage.setItem('__pdfData', JSON.stringify({
+        type: 'counseling', clientName: data.name, date: data.date, displayBody, scriptURL: SCRIPT_URL
+      }));
+      window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
+    }
+
+    // ✅ カウンセリングシートを保存（スプシ保存 → スクリーンショットビュー表示）
+    async function saveCounselingToServer() {
+      const data = collectCounseling();
+
+      if (!data.name) {
+        document.getElementById('driveStatus').textContent = '⚠️ 氏名を入力してください';
+        return;
+      }
+      if (!data.date) {
+        document.getElementById('driveStatus').textContent = '⚠️ 実施日を選択してください';
+        return;
+      }
+
+      const displayBody = buildCounselingDisplayBody(data);
+      localStorage.setItem('__pdfData', JSON.stringify({
+        type: 'counseling', clientName: data.name, date: data.date, displayBody, scriptURL: SCRIPT_URL
+      }));
+
+      showCounselingScreenshotView(data);
+
+      document.getElementById('driveStatus').textContent = '💾 スプシに保存中...';
+      await postToServer(Object.assign({ action: 'saveCounseling' }, data, { clientName: normalizeKey(data.name) }));
+      document.getElementById('driveStatus').textContent = '✅ 保存成功';
+      setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
+
+      localStorage.removeItem('__counselingFormData');
+    }
+
+    // =====================================================
+    // 🔄 カウンセリングシート：自動保存・復元
+    // =====================================================
+    let counselingSaveTimer = null;
+    function autoSaveCounseling() {
+      clearTimeout(counselingSaveTimer);
+      counselingSaveTimer = setTimeout(function() {
+        localStorage.setItem('__counselingFormData', JSON.stringify(collectCounseling()));
+      }, 500);
+    }
+
+    function restoreCounseling() {
+      const raw = localStorage.getItem('__counselingFormData');
+      if (!raw) return;
+      try {
+        applyCounseling(JSON.parse(raw));
+      } catch (e) {
+        console.error('Counseling restore error:', e);
+      }
+    }
+
     // ✅ 通常モードのみ初期化
     if (!PDF_MODE) {
-      document.getElementById('viewModeBtn').addEventListener('click', function() {
-        const clientName    = document.getElementById('clientName').value.trim();
-        const date          = document.getElementById('trainingDate').value;
-        const exercisesData = collectExercises();
-        updateMaxWeights(clientName, exercisesData);
-        const displayBody = buildDisplayBody(clientName, date, exercisesData);
-        localStorage.setItem('__pdfData', JSON.stringify({
-          clientName, date, displayBody, scriptURL: SCRIPT_URL
-        }));
-        window.open(location.origin + location.pathname + '?mode=pdf', '_blank');
-      });
-
       document.getElementById('trainerMemo').addEventListener('input', function() {
         const name = document.getElementById('clientName').value.trim();
         if (name) {
@@ -1188,6 +1701,20 @@
           });
         }
         localStorage.setItem('__weightsSynced2', '1');
+      }
+
+      // ===== カウンセリングシート：初期化 =====
+      restoreCounseling();
+
+      document.getElementById('counselingTab').addEventListener('input', autoSaveCounseling);
+      document.getElementById('counselingTab').addEventListener('change', autoSaveCounseling);
+
+      document.getElementById('counselingViewModeBtn').addEventListener('click', viewCounseling);
+
+      // ===== 最後に開いていたタブを復元 =====
+      const savedTab = localStorage.getItem('__activeTab');
+      if (savedTab === 'counseling') {
+        switchTab('counseling');
       }
     }
   </script>
