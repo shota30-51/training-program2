@@ -323,8 +323,7 @@
 
     .ss-sets-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 6px;
+      gap: 5px;
       margin-top: 6px;
     }
 
@@ -332,14 +331,12 @@
       background: #f5f7fa;
       border: 1px solid #e0e4ef;
       border-radius: 6px;
-      padding: 5px 8px;
       text-align: center;
-      font-size: 12px;
+      overflow: hidden;
     }
 
     .ss-set-label {
       color: #888;
-      font-size: 10px;
       display: block;
       margin-bottom: 2px;
     }
@@ -347,7 +344,6 @@
     .ss-set-value {
       font-weight: bold;
       color: #1a237e;
-      font-size: 13px;
     }
 
     .ss-remarks {
@@ -562,14 +558,22 @@
         const isLast = idx === exercisesData.length - 1;
         html += '<div class="ss-exercise-card' + (isLast ? ' last' : '') + '" style="' + (isLast ? 'border-radius:0 0 12px 12px;' : '') + '">';
         html += '<p class="ss-exercise-name"><span class="ss-part-badge">' + ex.part + '</span>' + ex.name + '</p>';
-        // セットグリッド
+        // セットグリッド（セット数に応じてフォントサイズ・列数を自動調整）
         if (ex.sets && ex.sets.length > 0) {
-          html += '<div class="ss-sets-grid">';
+          const n = ex.sets.length;
+          // セット数に応じてフォントサイズを計算
+          const valSize  = Math.max(11, 24 - n * 2);   // 1→22px, 4→16px, 7→11px
+          const lblSize  = Math.max(8,  14 - n);        // 1→13px, 4→10px, 7→8px
+          const repSize  = Math.max(8,  valSize - 3);   // ×回 はvalよりやや小さく
+          const padV     = n <= 3 ? 8 : n <= 5 ? 6 : 4;
+          const padH     = n <= 3 ? 10 : n <= 5 ? 7 : 5;
+          html += '<div class="ss-sets-grid" style="grid-template-columns:repeat(' + n + ',1fr);">';
           ex.sets.forEach(function(s, i) {
             const w = parseFloat(s.weight);
-            html += '<div class="ss-set-item">';
-            html += '<span class="ss-set-label">セット' + (i + 1) + '</span>';
-            html += '<span class="ss-set-value">' + (isNaN(w) ? '–' : w) + 'kg<br><span style="font-size:11px;font-weight:normal;color:#555;">× ' + (s.reps || '–') + '回</span></span>';
+            html += '<div class="ss-set-item" style="padding:' + padV + 'px ' + padH + 'px;">';
+            html += '<span class="ss-set-label" style="font-size:' + lblSize + 'px;">セット' + (i + 1) + '</span>';
+            html += '<span class="ss-set-value" style="font-size:' + valSize + 'px;">' + (isNaN(w) ? '–' : w) + 'kg</span>';
+            html += '<span style="display:block;font-size:' + repSize + 'px;color:#555;">× ' + (s.reps || '–') + '回</span>';
             html += '</div>';
           });
           html += '</div>';
