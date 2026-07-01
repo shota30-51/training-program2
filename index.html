@@ -248,10 +248,21 @@
 
     /* ===== スクリーンショット対象エリア ===== */
     #ssCapture {
-      max-width: calc(100% - 88px);
-      margin: 44px auto 0 auto;
+      max-width: calc(100% - 48px);
+      margin: 20px auto 0 auto;
       padding: 0 0 80px 0;
       transform-origin: top center;
+    }
+
+    /* ===== コンテンツ全体をラップする白いカード ===== */
+    .ss-content-wrapper {
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      min-height: calc(100vh - 160px);
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
     }
 
     .ss-card-header {
@@ -359,8 +370,8 @@
       text-align: center;
       font-size: 11px;
       color: #888;
-      padding: 12px;
-      margin-top: 4px;
+      padding: 32px 12px 24px 12px;
+      margin-top: auto;
     }
 
     /* 下部固定ボタンエリア */
@@ -759,6 +770,7 @@
 
       // ヘッダーカード（クライアント名・日付）
       let html = '';
+      html += '<div class="ss-content-wrapper">';
       html += '<div class="ss-card-header">';
       html += '<h2>トレーニングプログラム</h2>';
       html += '<div class="ss-client-row">';
@@ -800,6 +812,7 @@
 
       // フッター
       html += '<div class="ss-footer">作成日：' + new Date().toLocaleDateString('ja-JP') + '</div>';
+      html += '</div>'; // ss-content-wrapper
 
       capture.innerHTML = html;
       capture.style.transform = 'scale(1)';
