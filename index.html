@@ -1141,8 +1141,14 @@
     //   loadFromServer() と同じ通常のfetchでレスポンスを読み取り、実際の成否をtrue/falseで返す。
     async function postToServer(payload) {
       try {
-        const url = SCRIPT_URL + '?payload=' + encodeURIComponent(JSON.stringify(payload));
-        const res = await fetch(url);
+        // ★ GETのURLに全項目を載せる方式だと、カウンセリングシートのように自由記述欄が
+        //   多い場合にURLが長くなりすぎて送信が届かないことがあるため、POSTのボディで送る。
+        //   Content-Typeを明示的に指定しない（＝text/plain扱いになる）ことで、
+        //   GASが対応していないCORSプリフライトを回避しつつ、レスポンスも読み取れるようにする
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
         const data = await res.json();
         const ok = !!(data && data.status === 'ok');
         const now = new Date().toLocaleTimeString('ja-JP');
