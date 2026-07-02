@@ -1103,7 +1103,10 @@
         setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
         localStorage.removeItem('__formData');
       } else {
-        document.getElementById('driveStatus').textContent = '❌ 保存に失敗しました（入力内容はこの端末に残っています。もう一度「保存」を押してください）';
+        // ★ postToServer()がすでに詳細な失敗理由（サーバー応答 or 通信エラー）を
+        //   表示しているので、それを消さずに末尾に案内文を付け加える
+        const detail = document.getElementById('driveStatus').textContent;
+        document.getElementById('driveStatus').textContent = detail + '／入力内容はこの端末に残っています。もう一度「保存」を押してください';
       }
     }
 
@@ -1806,8 +1809,11 @@
       const sheetOk = await postToServer(Object.assign({ action: 'saveCounseling' }, data, { clientName: normalizeKey(data.name) }));
 
       // ★ スプシ保存が確認できなければ、ここで止めて端末側の下書きは残す
+      // postToServer()がすでに詳細な失敗理由（サーバー応答 or 通信エラー）を表示しているので、
+      // それを消さずに末尾に案内文を付け加える
       if (!sheetOk) {
-        document.getElementById('driveStatus').textContent = '❌ 保存に失敗しました（入力内容はこの端末に残っています。もう一度「保存」を押してください）';
+        const detail = document.getElementById('driveStatus').textContent;
+        document.getElementById('driveStatus').textContent = detail + '／入力内容はこの端末に残っています。もう一度「保存」を押してください';
         return;
       }
 
