@@ -1738,6 +1738,19 @@
       container.innerHTML = pdfData.displayBody;
       document.body.appendChild(container);
 
+      // ★ 上のcontainerは実際には画面上に存在している必要があるが、未加工の
+      //   レイアウトがそのまま見えると見た目が良くないので、上から不透明な
+      //   「作成中」画面で覆って隠す（html2canvasはcontainer自体のDOMを
+      //   キャプチャするので、上に重ねた別要素があっても変換結果には影響しない）
+      const loadingOverlay = document.createElement('div');
+      loadingOverlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:#f0f4f8;z-index:5001;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+      loadingOverlay.innerHTML =
+        '<div style="width:44px;height:44px;border:4px solid #c5cae9;border-top-color:#0d47a1;border-radius:50%;animation:cAndUploadSpin 0.8s linear infinite;"></div>' +
+        '<div style="font-size:15px;font-weight:bold;color:#1a237e;">📄 PDFを作成しています…</div>' +
+        '<div style="font-size:12px;color:#666;">このままお待ちください</div>' +
+        '<style>@keyframes cAndUploadSpin{to{transform:rotate(360deg);}}</style>';
+      document.body.appendChild(loadingOverlay);
+
       // ★ 追加した直後だとレンダリングが間に合わず白紙になることがあるため、
       //   トレーニング記録PDFと同様に少し待ってから変換する
       await new Promise(function(r) { setTimeout(r, 300); });
@@ -1783,6 +1796,7 @@
         return true;
       } finally {
         container.remove();
+        loadingOverlay.remove();
       }
     }
 
