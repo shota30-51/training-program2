@@ -1730,10 +1730,17 @@
         });
       }
 
+      // ★ 画面外（left:-9999px）に置くと、html2canvasが正しく描画できず
+      //   PDFが白紙になることがある（特にiPad/Safari）。
+      //   画面上に一時的に表示した状態で変換し、終わったら消す
       const container = document.createElement('div');
-      container.style.cssText = 'position:fixed;left:-9999px;top:0;width:750px;background:white;padding:20px 30px;box-sizing:border-box;font-family:Segoe UI,Helvetica Neue,sans-serif;';
+      container.style.cssText = 'position:fixed;top:0;left:50%;transform:translateX(-50%);width:750px;max-width:100%;background:white;padding:20px 30px;box-sizing:border-box;font-family:Segoe UI,Helvetica Neue,sans-serif;z-index:5000;';
       container.innerHTML = pdfData.displayBody;
       document.body.appendChild(container);
+
+      // ★ 追加した直後だとレンダリングが間に合わず白紙になることがあるため、
+      //   トレーニング記録PDFと同様に少し待ってから変換する
+      await new Promise(function(r) { setTimeout(r, 300); });
 
       try {
         const blob = await html2pdf().set({
