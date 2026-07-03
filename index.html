@@ -667,6 +667,7 @@
 
       <div class="button-area">
         <button id="counselingViewModeBtn">表示モード（別タブ）</button>
+        <button id="counselingClearBtn" class="remove-btn">🗑 入力内容をクリア</button>
       </div>
     </div>
 
@@ -1950,29 +1951,10 @@
         }
       });
 
-      // ★ トレーニング記録の「クライアント名」の入力が確定したタイミング（フォーカスが外れた時）で、
-      //   カウンセリングタブに「別人」の未保存データが残っていないか確認する。
-      //   入力中（inputイベント）ではなく change（＝入力し終わってフォーカスが外れた時）で判定することで、
-      //   1文字入力するたびに確認ダイアログが出てしまうのを防ぐ
-      document.getElementById('clientName').addEventListener('change', function() {
-        const name = document.getElementById('clientName').value.trim();
-        const normalized = normalizeKey(name);
-        if (!normalized) return;
-
-        const counselingRecords = (serverDataCache && serverDataCache.counseling) || {};
-        if (counselingRecords[normalized]) return; // 過去のカウンセリング記録が見つかった場合は反映済みなので対象外
-
-        const currentCName = document.getElementById('cName').value.trim();
-        if (!currentCName) return; // カウンセリングタブが空なら何もしない（先にカウンセリングを入力中のケース）
-
-        const currentCNameNormalized = normalizeKey(currentCName);
-        if (currentCNameNormalized === normalized) return; // 同一人物とみなせるので何もしない
-
-        // ここまで来たら「別人の未保存データ」が残っている状態
-        if (confirm('未保存です。クリアしますか？')) {
-          clearCounselingForm();
-        }
-      });
+      // ★ 2026-07-04: クライアント名切り替え時の自動クリア機能は、confirm()が
+      //   環境によって正しく機能せず、確認なしにカウンセリングタブが消えてしまう
+      //   事故が発生したため撤去。過去のカウンセリング記録が見つかった場合の
+      //   自動反映（上のリスナー内）のみ残し、それ以外では何もしない。
 
       if (!restoreForm()) {
         addExercise();
@@ -2035,6 +2017,14 @@
       document.getElementById('counselingTab').addEventListener('change', autoSaveCounseling);
 
       document.getElementById('counselingViewModeBtn').addEventListener('click', viewCounseling);
+
+      // ★ 手動クリアボタン：トレーナーが自分の判断で押したときだけカウンセリングタブを空にする
+      //   （自動でのクリアは誤動作の恐れがあるため廃止し、こちらに一本化）
+      document.getElementById('counselingClearBtn').addEventListener('click', function() {
+        if (confirm('カウンセリングシートの入力内容を消去しますか？')) {
+          clearCounselingForm();
+        }
+      });
 
       // ===== 最後に開いていたタブを復元 =====
       const savedTab = localStorage.getItem('__activeTab');
