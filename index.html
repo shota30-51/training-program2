@@ -1937,8 +1937,12 @@
               memoVal = v;
             }
           });
-          document.getElementById('trainerMemo').value = memoVal || localStorage.getItem('memo_' + normalized) || '';
-          if (memoVal) localStorage.setItem('memo_' + normalized, memoVal);
+          // ★ serverDataCacheはページを開いた時点のスナップショットで、
+          //   同じセッション内で追記・保存した最新内容より古い場合がある。
+          //   localStorageに値があれば（空文字も含めて）そちらを優先する
+          const localMemo = localStorage.getItem('memo_' + normalized);
+          document.getElementById('trainerMemo').value = (localMemo !== null) ? localMemo : (memoVal || '');
+          if (localMemo === null && memoVal) localStorage.setItem('memo_' + normalized, memoVal);
 
           // ★ 過去のカウンセリング記録（スプシ）があれば、カウンセリングタブに常に上書きで自動反映
           const counselingRecords = serverDataCache.counseling || {};
