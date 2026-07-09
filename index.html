@@ -895,7 +895,11 @@
           });
         }
 
-        await new Promise(function(r) { setTimeout(r, 300); });
+        // ★ 内容が長い（自由記述欄が多い）場合、0.3秒では描画が間に合わず
+        //   PDFが白紙になることがあったため、まず描画（ペイント）を1回待ってから
+        //   トレーニング記録PDFと同じ0.8秒の待機時間に延長した
+        await new Promise(function(r) { requestAnimationFrame(function() { requestAnimationFrame(r); }); });
+        await new Promise(function(r) { setTimeout(r, 800); });
 
         const el = document.getElementById('ssCapture');
         const blob = await html2pdf().set({
@@ -1752,9 +1756,11 @@
         '<style>@keyframes cAndUploadSpin{to{transform:rotate(360deg);}}</style>';
       document.body.appendChild(loadingOverlay);
 
-      // ★ 追加した直後だとレンダリングが間に合わず白紙になることがあるため、
-      //   トレーニング記録PDFと同様に少し待ってから変換する
-      await new Promise(function(r) { setTimeout(r, 300); });
+      // ★ 内容が長い（自由記述欄が多い）場合、0.3秒では描画が間に合わず
+      //   PDFが白紙になることがあったため、まず描画（ペイント）を1回待ってから
+      //   トレーニング記録PDFと同じ0.8秒の待機時間に延長した
+      await new Promise(function(r) { requestAnimationFrame(function() { requestAnimationFrame(r); }); });
+      await new Promise(function(r) { setTimeout(r, 800); });
 
       try {
         const blob = await html2pdf().set({
@@ -1844,6 +1850,13 @@
         document.getElementById('driveStatus').textContent = detail + '／入力内容はこの端末に残っています。もう一度「保存」を押してください';
         return;
       }
+
+      // ★ serverDataCacheはページを開いた時点のスナップショットなので、同じセッション内で
+      //   保存した直後にクライアント名を入力しても反映されない問題があった（トレーナーメモと同じ原因）。
+      //   保存が確認できた時点で、メモリ上のキャッシュにもこの内容を反映しておく
+      if (!serverDataCache) serverDataCache = { memos: {}, weights: {}, counseling: {} };
+      if (!serverDataCache.counseling) serverDataCache.counseling = {};
+      serverDataCache.counseling[normalizeKey(data.name)] = data;
 
       // ★ スプシ保存に成功した時点で、入力欄をクリアする（次のクライアントの氏名や項目が
       //   前の人のデータと混ざって保存されてしまう事故を防ぐため）。PDF生成は
