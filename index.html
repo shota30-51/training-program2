@@ -902,21 +902,45 @@
         await new Promise(function(r) { setTimeout(r, 800); });
 
         const el = document.getElementById('ssCapture');
-        const blob = await html2pdf().set({
-          margin: [8, 8, 8, 8],
-          image: { type: 'jpeg', quality: 0.95 },
-          html2canvas: {
-            scale: 2,
-            useCORS: false,
-            backgroundColor: '#f0f4f8',
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: el.offsetWidth,
-            logging: false
-          },
-          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-          pagebreak: { mode: ['css', 'legacy'], avoid: ['div'] }
-        }).from(el).outputPdf('blob');
+
+        // ★ 画面表示用に「縮小(transform:scale)」がかかったままキャプチャすると、
+        //   キャプチャする箱の大きさは縮小前のままなのに中身だけ中央寄りに縮んで
+        //   描画されるため、上側に空白ができ、PDFの1枚目が白紙になる原因になっていた。
+        //   PDF化の瞬間だけ縮小を解除し、キャプチャが終わったら画面表示用の縮小を元に戻す。
+        const prevTransform = el.style.transform;
+        const prevMarginTop = el.style.marginTop;
+        el.style.transform = 'none';
+        el.style.marginTop = '0px';
+        // transform解除がレイアウトに反映されるのを1フレーム待つ
+        await new Promise(function(r) { requestAnimationFrame(r); });
+
+        let blob;
+        try {
+          blob = await html2pdf().set({
+            margin: [8, 8, 8, 8],
+            image: { type: 'jpeg', quality: 0.95 },
+            html2canvas: {
+              scale: 2,
+              useCORS: false,
+              backgroundColor: '#f0f4f8',
+              scrollX: 0,
+              scrollY: 0,
+              windowWidth: el.offsetWidth,
+              logging: false
+            },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+            // ★ 本当の原因はこちら：avoid:['div'] は「div」というタグ全体に一致するため、
+            //   全体を包んでいる .ss-content-wrapper 自身も対象になってしまっていた。
+            //   その結果「中身をまるごと1ページに収めようとして収まらない→丸ごと次ページへ」
+            //   という判定が働き、1枚目が常に白紙になっていた（種目数の多い/少ないに関係なく発生）。
+            //   種目カード単位でだけ分割を避けたいので、対象を .ss-exercise-card だけに絞る。
+            pagebreak: { mode: ['css', 'legacy'], avoid: ['.ss-exercise-card'] }
+          }).from(el).outputPdf('blob');
+        } finally {
+          // 画面表示用の縮小表示を元に戻す（トレーナーが見る画面の見た目は変えない）
+          el.style.transform = prevTransform;
+          el.style.marginTop = prevMarginTop;
+        }
 
         btn.textContent = '📤 アップロード中...';
 
@@ -1107,6 +1131,10 @@
         document.getElementById('driveStatus').textContent = '✅ 保存成功';
         setTimeout(() => { document.getElementById('driveStatus').textContent = '待機中'; }, 5000);
         localStorage.removeItem('__formData');
+        // ★ この時点の画面内容を「保存済みスナップショット」として記録。
+        //   まだ画面上の入力欄自体は消していないため、この後に誤タップ等で
+        //   autoSaveForm()が呼ばれても、内容が同じ間は下書きを書き戻さないようにする
+        lastSavedFormSnapshot = JSON.stringify(collectFormSnapshot());
       } else {
         // ★ postToServer()がすでに詳細な失敗理由（サーバー応答 or 通信エラー）を
         //   表示しているので、それを消さずに末尾に案内文を付け加える
@@ -1385,31 +1413,53 @@
     // 🔄 フォーム自動保存・復元
     // =====================================================
     let autoSaveTimer = null;
+
+    // ★ 画面上の入力内容を、保存時と同じ形式のオブジェクトとして集める共通関数。
+    //   autoSaveForm()と「保存成功時のスナップショット記録」の両方から使うことで、
+    //   同じ形式で比較できるようにする。
+    function collectFormSnapshot() {
+      const formData = {
+        clientName: document.getElementById('clientName').value,
+        date: document.getElementById('trainingDate').value,
+        memo: document.getElementById('trainerMemo').value,
+        exercises: []
+      };
+      document.querySelectorAll('.exercise').forEach(function(ex) {
+        const part = ex.querySelector('.body-part').value;
+        const partOther = ex.querySelector('.body-part-other') ? ex.querySelector('.body-part-other').value : '';
+        const exerciseName = ex.querySelector('.exercise-name').value;
+        const exerciseOther = ex.querySelector('.exercise-name-other') ? ex.querySelector('.exercise-name-other').value : '';
+        const remarks = ex.querySelector('textarea[placeholder="備考"]').value;
+        const sets = [];
+        ex.querySelectorAll('.set-group').forEach(function(s) {
+          sets.push({
+            weight: s.querySelector('input[placeholder="重量(kg)"]').value,
+            reps: s.querySelector('input[placeholder="回数"]').value
+          });
+        });
+        formData.exercises.push({ part, partOther, exerciseName, exerciseOther, remarks, sets });
+      });
+      return formData;
+    }
+
+    // ★ 直近で保存に成功した内容のスナップショット（JSON文字列）。
+    //   保存成功時に更新し、これと同じ内容の間はオートセーブで下書きを
+    //   書き戻さないようにする（＝消したはずの下書きが復活するのを防ぐ）。
+    let lastSavedFormSnapshot = null;
+
     function autoSaveForm() {
       clearTimeout(autoSaveTimer);
       autoSaveTimer = setTimeout(function() {
-        const formData = {
-          clientName: document.getElementById('clientName').value,
-          date: document.getElementById('trainingDate').value,
-          memo: document.getElementById('trainerMemo').value,
-          exercises: []
-        };
-        document.querySelectorAll('.exercise').forEach(function(ex) {
-          const part = ex.querySelector('.body-part').value;
-          const partOther = ex.querySelector('.body-part-other') ? ex.querySelector('.body-part-other').value : '';
-          const exerciseName = ex.querySelector('.exercise-name').value;
-          const exerciseOther = ex.querySelector('.exercise-name-other') ? ex.querySelector('.exercise-name-other').value : '';
-          const remarks = ex.querySelector('textarea[placeholder="備考"]').value;
-          const sets = [];
-          ex.querySelectorAll('.set-group').forEach(function(s) {
-            sets.push({
-              weight: s.querySelector('input[placeholder="重量(kg)"]').value,
-              reps: s.querySelector('input[placeholder="回数"]').value
-            });
-          });
-          formData.exercises.push({ part, partOther, exerciseName, exerciseOther, remarks, sets });
-        });
-        localStorage.setItem('__formData', JSON.stringify(formData));
+        const formData = collectFormSnapshot();
+        const snapshotStr = JSON.stringify(formData);
+
+        // ★ 保存済みの内容と完全に同じままなら、下書きを書き戻さない。
+        //   （誤タップ等で保存直後の内容がそのままautoSaveFormに渡ってきても、
+        //   　消したはずの__formDataが復活してしまう不具合を防ぐため）
+        if (lastSavedFormSnapshot !== null && snapshotStr === lastSavedFormSnapshot) {
+          return;
+        }
+        localStorage.setItem('__formData', snapshotStr);
       }, 500);
     }
 
