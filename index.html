@@ -2054,8 +2054,15 @@
       //   事故が発生したため撤去。過去のカウンセリング記録が見つかった場合の
       //   自動反映（上のリスナー内）のみ残し、それ以外では何もしない。
 
-      if (!restoreForm()) {
-        addExercise();
+if (!restoreForm()) {
+        // ★ 2026-09-22: ページ読み込み直後（描画完了前）にaddExercise()を呼ぶと、
+        //   1件目の部位セレクトのchangeイベントが正しく機能しないことがあったため、
+        //   画面の描画が終わったタイミング（次のフレーム）まで生成を遅らせる
+        requestAnimationFrame(function() {
+          requestAnimationFrame(function() {
+            addExercise();
+          });
+        });
       }
 
       document.getElementById('mainContainer').addEventListener('input', autoSaveForm);
