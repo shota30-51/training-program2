@@ -2050,8 +2050,8 @@
       //   事故が発生したため撤去。過去のカウンセリング記録が見つかった場合の
       //   自動反映（上のリスナー内）のみ残し、それ以外では何もしない。
 
-      if (!restoreForm()) {
-        addExercise();
+         if (!restoreForm()) {
+        // 何もしない（最初の種目は「種目を追加」ボタンを押してもらう）
       }
 
       document.getElementById('mainContainer').addEventListener('input', autoSaveForm);
