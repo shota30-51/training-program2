@@ -877,9 +877,11 @@
     // スクリーンショット用画面のコンテンツをそのままPDF保存
     async function savePdfFromScreenshot() {
       const btn = document.querySelector('.ss-pdf-btn');
-      const clientName = document.getElementById('clientName').value.trim();
-      const date = document.getElementById('trainingDate').value;
-
+      // ★ 保存成功後に入力欄をクリアするようになったため、画面から直接読むと
+      //   空になってしまう。保存時にlocalStorageへ記録済みの正しい値を使う
+      const savedPdfData = JSON.parse(localStorage.getItem('__pdfData') || '{}');
+      const clientName = savedPdfData.clientName || '';
+      const date = savedPdfData.date || '';
       btn.textContent = '⏳ 生成中...';
       btn.disabled = true;
 
